@@ -1,0 +1,18 @@
+name: 'AI QA Gate'
+type: module
+description: 'Configurable AI Content QA gate framework for any entity type with pluggable report analyzers and optional moderation gating.'
+core_version_requirement: ^10 || ^11
+package: AI
+configure: ai_qa_gate.admin_profiles
+
+dependencies:
+  - drupal:field
+  - drupal:text
+  - drupal:user
+  - drupal:options
+  - ai:ai
+
+test_dependencies:
+  - drupal:node
+  - content_moderation:content_moderation
+

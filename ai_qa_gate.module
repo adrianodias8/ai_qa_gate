@@ -1,0 +1,285 @@
+<?php
+
+/**
+ * @file
+ * Primary module hooks for AI QA Gate module.
+ */
+
+declare(strict_types=1);
+
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function ai_qa_gate_help(string $route_name, RouteMatchInterface $route_match): ?string {
+  switch ($route_name) {
+    case 'help.page.ai_qa_gate':
+      $output = '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The AI QA Gate module provides a configurable AI-powered content quality assurance framework. It can analyze any entity type with pluggable report analyzers and optionally gate content moderation transitions based on analysis results.') . '</p>';
+      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Managing QA Profiles') . '</dt>';
+      $output .= '<dd>' . t('QA Profiles define which entity types and bundles are analyzed, which fields to include, and which report plugins to run. Configure at <a href=":url">AI QA Gate settings</a>.', [':url' => '/admin/config/ai-qa-gate/profiles']) . '</dd>';
+      $output .= '<dt>' . t('Managing Policies') . '</dt>';
+      $output .= '<dd>' . t('Policies provide reusable context and guidelines injected into AI prompts. They can include policy text, good/bad examples, disallowed phrases, and required disclaimers.') . '</dd>';
+      $output .= '<dt>' . t('Running Analysis') . '</dt>';
+      $output .= '<dd>' . t('Users with the "run ai qa analysis" permission can trigger analysis from the AI Review tab on supported entities.') . '</dd>';
+      $output .= '<dt>' . t('Content Moderation Gating') . '</dt>';
+      $output .= '<dd>' . t('If Content Moderation is enabled, QA profiles can be configured to block workflow transitions when findings exceed a severity threshold.') . '</dd>';
+      $output .= '</dl>';
+      return $output;
+
+    default:
+      return NULL;
+  }
+}
+
+/**
+ * Implements hook_entity_type_build().
+ */
+function ai_qa_gate_entity_type_build(array &$entity_types): void {
+  // Add local task links for supported entity types.
+  // This is handled dynamically in routing and local task derivatives.
+}
+
+/**
+ * Implements hook_entity_presave().
+ *
+ * Note: This is a backstop for programmatic saves. Form validation handles
+ * user-facing saves gracefully. Programmatic saves that violate gating will
+ * still throw an exception.
+ */
+function ai_qa_gate_entity_presave(EntityInterface $entity): void {
+  // Skip if we're in form context (validation already handled it).
+  $form_validation_passed = &drupal_static('ai_qa_gate_form_validation_passed', []);
+  $entity_key = $entity->getEntityTypeId() . ':' . ($entity->id() ?? 'new');
+  if (!empty($form_validation_passed[$entity_key])) {
+    return;
+  }
+
+  // Handle moderation gating validation.
+  if (!\Drupal::moduleHandler()->moduleExists('content_moderation')) {
+    return;
+  }
+
+  // Check if entity is a content entity before checking for fields.
+  // Config entities (like Views) don't have the hasField() method.
+  if (!($entity instanceof ContentEntityInterface)) {
+    return;
+  }
+
+  // Check if entity has moderation enabled.
+  if (!$entity->hasField('moderation_state')) {
+    return;
+  }
+
+  /** @var \Drupal\ai_qa_gate\Service\GatingServiceInterface $gating_service */
+  $gating_service = \Drupal::service('ai_qa_gate.gating');
+
+  // Check if gating should block this save.
+  $violation = $gating_service->checkGating($entity);
+  if ($violation) {
+    throw new \Drupal\ai_qa_gate\Exception\GatingViolationException($violation);
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Add gating validation to content entity forms with moderation.
+ */
+function ai_qa_gate_form_alter(array &$form, FormStateInterface $form_state, string $form_id): void {
+  // Handle the content moderation form (appears on entity view pages).
+  if ($form_id === 'content_moderation_entity_moderation_form') {
+    $form['#validate'][] = 'ai_qa_gate_moderation_form_validate';
+    return;
+  }
+
+  // Handle content entity forms (node, media, etc.).
+  $form_object = $form_state->getFormObject();
+  if ($form_object instanceof \Drupal\Core\Entity\ContentEntityFormInterface) {
+    $entity = $form_object->getEntity();
+    if ($entity instanceof ContentEntityInterface && $entity->hasField('moderation_state')) {
+      $form['#validate'][] = 'ai_qa_gate_entity_form_validate';
+    }
+  }
+}
+
+/**
+ * Validation handler for the content moderation form.
+ */
+function ai_qa_gate_moderation_form_validate(array &$form, FormStateInterface $form_state): void {
+  // Get the entity from form state.
+  $entity = $form_state->get('entity');
+  if (!$entity instanceof ContentEntityInterface) {
+    return;
+  }
+
+  // Get the new moderation state from form values.
+  $new_state = $form_state->getValue('new_state');
+  if (!$new_state) {
+    return;
+  }
+
+  // Create a temporary entity clone with the new state to check gating.
+  $temp_entity = clone $entity;
+  $temp_entity->set('moderation_state', $new_state);
+  $temp_entity->original = $entity;
+
+  /** @var \Drupal\ai_qa_gate\Service\GatingServiceInterface $gating_service */
+  $gating_service = \Drupal::service('ai_qa_gate.gating');
+
+  $violation = $gating_service->checkGating($temp_entity);
+  if ($violation) {
+    $form_state->setErrorByName('new_state', $violation);
+  }
+  else {
+    // Mark that validation passed so presave doesn't double-check.
+    $form_validation_passed = &drupal_static('ai_qa_gate_form_validation_passed', []);
+    $entity_key = $entity->getEntityTypeId() . ':' . ($entity->id() ?? 'new');
+    $form_validation_passed[$entity_key] = TRUE;
+  }
+}
+
+/**
+ * Validation handler for content entity forms.
+ */
+function ai_qa_gate_entity_form_validate(array &$form, FormStateInterface $form_state): void {
+  $form_object = $form_state->getFormObject();
+  if (!$form_object instanceof \Drupal\Core\Entity\ContentEntityFormInterface) {
+    return;
+  }
+
+  $entity = $form_object->buildEntity($form, $form_state);
+  if (!$entity instanceof ContentEntityInterface) {
+    return;
+  }
+
+  if (!$entity->hasField('moderation_state')) {
+    return;
+  }
+
+  /** @var \Drupal\ai_qa_gate\Service\GatingServiceInterface $gating_service */
+  $gating_service = \Drupal::service('ai_qa_gate.gating');
+
+  $violation = $gating_service->checkGating($entity);
+  if ($violation) {
+    // Set error on moderation_state field if it exists in form.
+    if (isset($form['moderation_state'])) {
+      $form_state->setErrorByName('moderation_state', $violation);
+    }
+    else {
+      // Fallback to general form error.
+      $form_state->setError($form, $violation);
+    }
+  }
+  else {
+    // Mark that validation passed so presave doesn't double-check.
+    $form_validation_passed = &drupal_static('ai_qa_gate_form_validation_passed', []);
+    $entity_key = $entity->getEntityTypeId() . ':' . ($entity->id() ?? 'new');
+    $form_validation_passed[$entity_key] = TRUE;
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function ai_qa_gate_theme(): array {
+  return [
+    'ai_qa_gate_review' => [
+      'variables' => [
+        'entity' => NULL,
+        'profile' => NULL,
+        'qa_run' => NULL,
+        'is_stale' => FALSE,
+        'findings_by_category' => [],
+        'summary' => NULL,
+        'can_run' => FALSE,
+      ],
+    ],
+    'ai_qa_gate_finding' => [
+      'variables' => [
+        'finding' => [],
+      ],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_requirements().
+ */
+function ai_qa_gate_requirements(string $phase): array {
+  $requirements = [];
+
+  if ($phase === 'runtime') {
+    $ai_module_installed = \Drupal::moduleHandler()->moduleExists('ai');
+
+    $requirements['ai_qa_gate_ai_module'] = [
+      'title' => t('AI QA Gate - AI Module'),
+      'value' => $ai_module_installed ? t('AI module installed') : t('AI module not installed'),
+      'severity' => $ai_module_installed ? REQUIREMENT_OK : REQUIREMENT_WARNING,
+    ];
+
+    if (!$ai_module_installed) {
+      $requirements['ai_qa_gate_ai_module']['description'] = t('The AI module is not installed. AI QA Gate will not be able to run analyses until the AI module is installed and configured with a provider.');
+    }
+    else {
+      // Check if a default provider is configured for chat.
+      /** @var \Drupal\ai\AiProviderPluginManager $ai_provider_manager */
+      $ai_provider_manager = \Drupal::service('ai.provider');
+      $default_provider = $ai_provider_manager->getDefaultProviderForOperationType('chat');
+
+      if (empty($default_provider)) {
+        $requirements['ai_qa_gate_ai_provider'] = [
+          'title' => t('AI QA Gate - AI Provider'),
+          'value' => t('No default chat provider configured'),
+          'severity' => REQUIREMENT_WARNING,
+          'description' => t('No default AI provider is configured for chat operations. Please configure one at <a href=":url">AI Settings</a>.', [
+            ':url' => '/admin/config/ai/settings',
+          ]),
+        ];
+      }
+    }
+  }
+
+  return $requirements;
+}
+
+/**
+ * Implements hook_views_data_alter().
+ */
+function ai_qa_gate_views_data_alter(array &$data): void {
+  // Relate the node revision to its AI QA Run.
+  // We use node_field_revision as the base because that is what the
+  // moderated_content view uses.
+  $data['node_field_revision']['qa_run'] = [
+    'title' => t('QA Run'),
+    'help' => t('The QA Run associated with this revision.'),
+    'relationship' => [
+      'base' => 'qa_run',
+      'base field' => 'revision_id',
+      'field' => 'vid',
+      'id' => 'standard',
+      'label' => t('QA Run'),
+      'extra' => [
+        [
+          'field' => 'entity_type_id',
+          'value' => 'node',
+        ],
+      ],
+    ],
+  ];
+
+  // Add the severity summary matching field to qa_run.
+  $data['qa_run']['severity_summary'] = [
+    'title' => t('Severity Summary'),
+    'help' => t('Visual summary of findings by severity.'),
+    'field' => [
+      'id' => 'qa_run_severity_summary',
+    ],
+  ];
+}

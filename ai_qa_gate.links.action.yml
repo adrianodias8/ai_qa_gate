@@ -1,0 +1,12 @@
+ai_qa_gate.admin_profile_add:
+  route_name: ai_qa_gate.admin_profile_add
+  title: 'Add QA Profile'
+  appears_on:
+    - ai_qa_gate.admin_profiles
+
+ai_qa_gate.admin_policy_add:
+  route_name: ai_qa_gate.admin_policy_add
+  title: 'Add QA Policy'
+  appears_on:
+    - ai_qa_gate.admin_policies
+

@@ -1,0 +1,26 @@
+administer ai qa gate:
+  title: 'Administer AI QA Gate'
+  description: 'Manage QA profiles and policies configuration.'
+  restrict access: true
+
+run ai qa analysis:
+  title: 'Run AI QA Analysis'
+  description: 'Trigger AI QA analysis on supported entities.'
+
+view ai qa results:
+  title: 'View AI QA Results'
+  description: 'View AI QA analysis results on the AI Review tab.'
+
+override ai qa gate:
+  title: 'Override AI QA Gate'
+  description: 'Allow content moderation transitions even when AI QA findings exceed the severity threshold.'
+  restrict access: true
+
+acknowledge ai qa findings:
+  title: 'Acknowledge AI QA Findings'
+  description: 'Mark AI QA findings as acknowledged to allow content publishing.'
+
+convert findings to examples:
+  title: 'Convert QA findings to policy examples'
+  description: 'Allow users to generate and save policy examples from QA findings using AI.'
+

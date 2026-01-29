@@ -1,0 +1,11 @@
+id: style_guide_accessibility_and_inclusivity_review
+label: 'Style guide - Accessibility and Inclusivity Review'
+policy_text: 'Ensure language is inclusive and accessible to all users. Use gender-neutral terms and singular "they". Provide meaningful alt text for all images. Avoid cultural references, idioms, and regional slang unfamiliar to international users.'
+examples_good: "- \"The police officer filed the report promptly.\"\r\n- \"Each visitor should ensure they have their ID badge.\"\r\n- \"If you wish to complain, you must first contact the national authorities.\"\r\n- <img src=\"map.png\" alt=\"Map showing EU member countries\">\nGOOD: \"Learn more about the €15.5 billion renewable energy campaign in Africa\""
+examples_bad: "- \"The chairman will announce his decision tomorrow.\"\r\n- \"If a customer wishes to complain, he must contact the authorities.\"\r\n- \"Our app is so easy your grandma could use it!\"\r\n- <img src=\"chart.png\" alt=\"\">"
+disallowed_phrases: "- Gender-specific job titles (\"policeman,\" \"chairman\")\r\n- \"He or she,\" \"(s)he\"\r\n- Slang and idioms (e.g. \"kick the bucket\")\r\n- Derogatory or exclusive language"
+required_disclaimers: 'None required.'
+metadata:
+  jurisdiction: EU
+  audience: general
+  version: '1.0'

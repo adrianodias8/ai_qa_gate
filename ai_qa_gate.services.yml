@@ -1,0 +1,69 @@
+services:
+  # Plugin Manager
+  plugin.manager.qa_report:
+    class: Drupal\ai_qa_gate\QaReportPluginManager
+    parent: default_plugin_manager
+
+  # AI Client
+  ai_qa_gate.ai_client:
+    class: Drupal\ai_qa_gate\AiClient\AiClientFactory
+    arguments:
+      - '@module_handler'
+      - '@service_container'
+
+  # Context Builder Service
+  ai_qa_gate.context_builder:
+    class: Drupal\ai_qa_gate\Service\ContextBuilder
+    arguments:
+      - '@entity_type.manager'
+      - '@entity_field.manager'
+      - '@renderer'
+
+  # Runner Service
+  ai_qa_gate.runner:
+    class: Drupal\ai_qa_gate\Service\Runner
+    arguments:
+      - '@entity_type.manager'
+      - '@ai_qa_gate.context_builder'
+      - '@ai_qa_gate.ai_client'
+      - '@plugin.manager.qa_report'
+      - '@queue'
+      - '@current_user'
+      - '@datetime.time'
+      - '@logger.factory'
+      - '@config.factory'
+
+  # Gating Service
+  ai_qa_gate.gating:
+    class: Drupal\ai_qa_gate\Service\GatingService
+    arguments:
+      - '@entity_type.manager'
+      - '@ai_qa_gate.runner'
+      - '@ai_qa_gate.context_builder'
+      - '@current_user'
+      - '@module_handler'
+      - '@logger.factory'
+
+  # Profile Matcher Service
+  ai_qa_gate.profile_matcher:
+    class: Drupal\ai_qa_gate\Service\ProfileMatcher
+    arguments:
+      - '@entity_type.manager'
+
+  # Example Generator Service
+  ai_qa_gate.example_generator:
+    class: Drupal\ai_qa_gate\Service\ExampleGenerator
+    arguments:
+      - '@ai_qa_gate.ai_client'
+      - '@logger.factory'
+      - '@string_translation'
+
+  # Access checker for AI Review tab
+  ai_qa_gate.access_checker:
+    class: Drupal\ai_qa_gate\Access\AiReviewAccessChecker
+    arguments:
+      - '@ai_qa_gate.profile_matcher'
+      - '@current_user'
+    tags:
+      - { name: access_check, applies_to: _ai_qa_gate_review_access }
+

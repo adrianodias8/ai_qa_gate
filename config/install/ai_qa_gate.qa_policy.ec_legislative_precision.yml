@@ -1,0 +1,58 @@
+id: ec_legislative_precision
+label: 'EC Legislative Precision'
+policy_text: |
+  ## Legislative Communication Standards
+
+  ### Status Indicators
+  All references to EU legislation must indicate:
+  - Current procedural status (proposal, trilogue, adopted, in force)
+  - Applicable dates (entry into force, application dates, deadlines)
+  - Relevant legal basis
+
+  ### Terminology Requirements
+  - Use official legislative titles and numbers (e.g., "Regulation (EU) 2022/2065")
+  - Distinguish between Regulations (directly applicable) and Directives (require transposition)
+  - Avoid absolute legal interpretations that should come from courts
+
+  ### Claims and Obligations
+  - Differentiate between:
+    - What the law requires
+    - What the Commission recommends
+    - What implementation guidance suggests
+  - Avoid stating legal consequences without proper caveats
+  - Do not make definitive statements about legal interpretation
+
+  ### Risk Language
+  Avoid:
+  - Guarantees about legal outcomes
+  - Absolute statements about compliance
+  - Predictions about enforcement actions
+
+examples_good: |
+  GOOD: "Article 6 of Regulation (EU) 2022/2065 requires providers to include specific information in their terms and conditions."
+  GOOD: "The Directive must be transposed into national law by Member States by [date]."
+  GOOD: "Depending on interpretation, platforms may need to implement additional measures."
+
+examples_bad: |
+  BAD: "The law ensures platforms will be held accountable." (interpretation, not fact)
+  BAD: "Companies must comply or face huge fines." (oversimplified threat)
+  BAD: "This regulation covers all online services." (too absolute without specifying scope)
+
+disallowed_phrases: |
+  will be forced to
+  guarantees compliance
+  ensures accountability
+  mandatory for all
+  no exceptions
+  absolute requirement
+  the law says
+  legally binding for everyone
+
+required_disclaimers: |
+  For legal advice regarding specific situations, please consult qualified legal professionals or relevant national authorities.
+
+metadata:
+  jurisdiction: EU
+  audience: legal_professionals
+  version: '1.0'
+

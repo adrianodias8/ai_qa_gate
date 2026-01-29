@@ -1,0 +1,294 @@
+# Admin routes for profiles
+ai_qa_gate.admin_profiles:
+  path: '/admin/config/ai-qa-gate/profiles'
+  defaults:
+    _entity_list: 'qa_profile'
+    _title: 'AI QA Gate Profiles'
+  requirements:
+    _permission: 'administer ai qa gate'
+
+# Entity routes for qa_profile (auto-generated from links annotation)
+entity.qa_profile.collection:
+  path: '/admin/config/ai-qa-gate/profiles'
+  defaults:
+    _entity_list: 'qa_profile'
+    _title: 'AI QA Gate Profiles'
+  requirements:
+    _permission: 'administer ai qa gate'
+
+entity.qa_profile.add_form:
+  path: '/admin/config/ai-qa-gate/profiles/add'
+  defaults:
+    _entity_form: 'qa_profile.add'
+    _title: 'Add QA Profile'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_profile:
+        type: entity:qa_profile
+
+entity.qa_profile.edit_form:
+  path: '/admin/config/ai-qa-gate/profiles/{qa_profile}/edit'
+  defaults:
+    _entity_form: 'qa_profile.edit'
+    _title: 'Edit QA Profile'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_profile:
+        type: entity:qa_profile
+
+entity.qa_profile.delete_form:
+  path: '/admin/config/ai-qa-gate/profiles/{qa_profile}/delete'
+  defaults:
+    _entity_form: 'qa_profile.delete'
+    _title: 'Delete QA Profile'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_profile:
+        type: entity:qa_profile
+
+# Legacy routes (for backwards compatibility)
+ai_qa_gate.admin_profile_add:
+  path: '/admin/config/ai-qa-gate/profiles/add'
+  defaults:
+    _entity_form: 'qa_profile.add'
+    _title: 'Add QA Profile'
+  requirements:
+    _permission: 'administer ai qa gate'
+
+ai_qa_gate.admin_profile_edit:
+  path: '/admin/config/ai-qa-gate/profiles/{qa_profile}/edit'
+  defaults:
+    _entity_form: 'qa_profile.edit'
+    _title: 'Edit QA Profile'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_profile:
+        type: entity:qa_profile
+
+ai_qa_gate.admin_profile_delete:
+  path: '/admin/config/ai-qa-gate/profiles/{qa_profile}/delete'
+  defaults:
+    _entity_form: 'qa_profile.delete'
+    _title: 'Delete QA Profile'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_profile:
+        type: entity:qa_profile
+
+# Admin routes for policies
+ai_qa_gate.admin_policies:
+  path: '/admin/config/ai-qa-gate/policies'
+  defaults:
+    _entity_list: 'qa_policy'
+    _title: 'AI QA Gate Policies'
+  requirements:
+    _permission: 'administer ai qa gate'
+
+# Entity routes for qa_policy (auto-generated from links annotation)
+entity.qa_policy.collection:
+  path: '/admin/config/ai-qa-gate/policies'
+  defaults:
+    _entity_list: 'qa_policy'
+    _title: 'AI QA Gate Policies'
+  requirements:
+    _permission: 'administer ai qa gate'
+
+entity.qa_policy.add_form:
+  path: '/admin/config/ai-qa-gate/policies/add'
+  defaults:
+    _entity_form: 'qa_policy.add'
+    _title: 'Add QA Policy'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_policy:
+        type: entity:qa_policy
+
+entity.qa_policy.edit_form:
+  path: '/admin/config/ai-qa-gate/policies/{qa_policy}/edit'
+  defaults:
+    _entity_form: 'qa_policy.edit'
+    _title: 'Edit QA Policy'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_policy:
+        type: entity:qa_policy
+
+entity.qa_policy.delete_form:
+  path: '/admin/config/ai-qa-gate/policies/{qa_policy}/delete'
+  defaults:
+    _entity_form: 'qa_policy.delete'
+    _title: 'Delete QA Policy'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_policy:
+        type: entity:qa_policy
+
+# Legacy routes (for backwards compatibility)
+ai_qa_gate.admin_policy_add:
+  path: '/admin/config/ai-qa-gate/policies/add'
+  defaults:
+    _entity_form: 'qa_policy.add'
+    _title: 'Add QA Policy'
+  requirements:
+    _permission: 'administer ai qa gate'
+
+ai_qa_gate.admin_policy_edit:
+  path: '/admin/config/ai-qa-gate/policies/{qa_policy}/edit'
+  defaults:
+    _entity_form: 'qa_policy.edit'
+    _title: 'Edit QA Policy'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_policy:
+        type: entity:qa_policy
+
+ai_qa_gate.admin_policy_delete:
+  path: '/admin/config/ai-qa-gate/policies/{qa_policy}/delete'
+  defaults:
+    _entity_form: 'qa_policy.delete'
+    _title: 'Delete QA Policy'
+  requirements:
+    _permission: 'administer ai qa gate'
+  options:
+    parameters:
+      qa_policy:
+        type: entity:qa_policy
+
+# Admin settings
+ai_qa_gate.admin_settings:
+  path: '/admin/config/ai-qa-gate/settings'
+  defaults:
+    _form: '\Drupal\ai_qa_gate\Form\SettingsForm'
+    _title: 'AI QA Gate Settings'
+  requirements:
+    _permission: 'administer ai qa gate'
+
+# AI Review routes for entities - using dynamic route subscriber
+ai_qa_gate.entity_review:
+  path: '/ai-qa-gate/{entity_type_id}/{entity}/ai-review'
+  defaults:
+    _controller: '\Drupal\ai_qa_gate\Controller\AiReviewController::review'
+    _title: 'AI Review'
+  requirements:
+    _custom_access: '\Drupal\ai_qa_gate\Controller\AiReviewController::access'
+  options:
+    _admin_route: TRUE
+    parameters:
+      entity:
+        type: entity:{entity_type_id}
+
+ai_qa_gate.entity_run:
+  path: '/ai-qa-gate/{entity_type_id}/{entity}/ai-review/run'
+  defaults:
+    _form: '\Drupal\ai_qa_gate\Form\RunQaForm'
+    _title: 'Run AI QA Analysis'
+  requirements:
+    _custom_access: '\Drupal\ai_qa_gate\Controller\AiReviewController::runAccess'
+  options:
+    _admin_route: TRUE
+    parameters:
+      entity:
+        type: entity:{entity_type_id}
+
+# Specific node route for easier access
+ai_qa_gate.node_review:
+  path: '/node/{node}/ai-review'
+  defaults:
+    _controller: '\Drupal\ai_qa_gate\Controller\AiReviewController::nodeReview'
+    _title: 'AI Review'
+  requirements:
+    _custom_access: '\Drupal\ai_qa_gate\Controller\AiReviewController::nodeAccess'
+  options:
+    _admin_route: TRUE
+    parameters:
+      node:
+        type: entity:node
+
+ai_qa_gate.node_run:
+  path: '/node/{node}/ai-review/run'
+  defaults:
+    _form: '\Drupal\ai_qa_gate\Form\RunQaForm'
+    _title: 'Run AI QA Analysis'
+    entity_type_id: 'node'
+  requirements:
+    _custom_access: '\Drupal\ai_qa_gate\Controller\AiReviewController::nodeRunAccess'
+  options:
+    _admin_route: TRUE
+    parameters:
+      node:
+        type: entity:node
+
+# Per-plugin run routes
+ai_qa_gate.node_run_plugin:
+  path: '/node/{node}/ai-review/run/{plugin_id}'
+  defaults:
+    _form: '\Drupal\ai_qa_gate\Form\RunPluginForm'
+    _title: 'Run Plugin Analysis'
+    entity_type_id: 'node'
+  requirements:
+    _custom_access: '\Drupal\ai_qa_gate\Controller\AiReviewController::nodeRunAccess'
+  options:
+    _admin_route: TRUE
+    parameters:
+      node:
+        type: entity:node
+
+ai_qa_gate.entity_run_plugin:
+  path: '/ai-qa-gate/{entity_type_id}/{entity}/ai-review/run/{plugin_id}'
+  defaults:
+    _form: '\Drupal\ai_qa_gate\Form\RunPluginForm'
+    _title: 'Run Plugin Analysis'
+  requirements:
+    _custom_access: '\Drupal\ai_qa_gate\Controller\AiReviewController::runAccess'
+  options:
+    _admin_route: TRUE
+    parameters:
+      entity:
+        type: entity:{entity_type_id}
+
+# Acknowledgement route
+ai_qa_gate.acknowledge_finding:
+  path: '/admin/qa-finding/{qa_finding}/acknowledge'
+  defaults:
+    _entity_form: 'qa_finding.acknowledge'
+    _title: 'Acknowledge Finding'
+  requirements:
+    _permission: 'acknowledge ai qa findings'
+  options:
+    _admin_route: TRUE
+    parameters:
+      qa_finding:
+        type: entity:qa_finding
+
+# Convert finding to policy example
+ai_qa_gate.convert_to_example:
+  path: '/admin/qa-finding/{qa_finding}/to-example'
+  defaults:
+    _form: '\Drupal\ai_qa_gate\Form\ConvertToExampleForm'
+    _title: 'Convert finding to policy example'
+  requirements:
+    _permission: 'convert findings to examples'
+  options:
+    _admin_route: TRUE
+    parameters:
+      qa_finding:
+        type: entity:qa_finding
+

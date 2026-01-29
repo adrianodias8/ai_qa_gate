@@ -1,0 +1,54 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the AI QA Gate module.
+ */
+
+declare(strict_types=1);
+
+use Drupal\Core\Database\Database;
+
+/**
+ * Implements hook_schema().
+ */
+function ai_qa_gate_schema(): array {
+  $schema = [];
+
+  // The qa_run content entity uses its own table managed by the entity system.
+  // No custom schema needed here as we use ContentEntityBase.
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function ai_qa_gate_install(): void {
+  // Display a message about AI module requirement.
+  if (!\Drupal::moduleHandler()->moduleExists('ai')) {
+    \Drupal::messenger()->addWarning(t('The AI module is not installed. AI QA Gate will not be able to run analyses until the AI module is installed and configured with a provider.'));
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function ai_qa_gate_uninstall(): void {
+  // Clean up any remaining configuration.
+  $config_factory = \Drupal::configFactory();
+
+  // Delete all qa_profile configs.
+  foreach ($config_factory->listAll('ai_qa_gate.qa_profile.') as $config_name) {
+    $config_factory->getEditable($config_name)->delete();
+  }
+
+  // Delete all qa_policy configs.
+  foreach ($config_factory->listAll('ai_qa_gate.qa_policy.') as $config_name) {
+    $config_factory->getEditable($config_name)->delete();
+  }
+
+  // Delete module settings.
+  $config_factory->getEditable('ai_qa_gate.settings')->delete();
+}
+

@@ -1,0 +1,11 @@
+id: style_guide_seo_and_formatting_review
+label: 'Style guide - SEO and Formatting Review'
+policy_text: 'Ensure content is formatted for readability and SEO. Page titles should be short and specific. Meta descriptions must be concise and informative. Use subheadings, bullet points, and short paragraphs. Avoid keyword stuffing and generic link text.'
+examples_good: "- Title: \"Apply for EU Student Funding – Step-by-Step Guide\"\r\n- Meta: \"Learn how to apply for EU student funding with our step-by-step guide.\"\r\n- Bullet list for benefits\r\n- Link: \"Download the EU funding application form\""
+examples_bad: "- Title: \"BETTER REGULATION IN THE EUROPEAN UNION | EUROPEAN COMMISSION\"\r\n- Meta: \"This page contains various information about EU funding.\"\r\n- Walls of text without headings\r\n- Link: \"Click here\""
+disallowed_phrases: "- Redundant phrases in headings (\"Welcome to...\")\r\n- Stop words in titles (\"the,\" \"and\")\r\n- Keyword stuffing\r\n- Excessive sentence length (>25 words)\r\n- Generic link text"
+required_disclaimers: 'None required.'
+metadata:
+  jurisdiction: EU
+  audience: general
+  version: '1.0'

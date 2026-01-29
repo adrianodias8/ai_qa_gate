@@ -1,0 +1,25 @@
+# Admin task links
+ai_qa_gate.admin_profiles:
+  title: 'Profiles'
+  route_name: ai_qa_gate.admin_profiles
+  base_route: ai_qa_gate.admin_profiles
+
+ai_qa_gate.admin_policies:
+  title: 'Policies'
+  route_name: ai_qa_gate.admin_policies
+  base_route: ai_qa_gate.admin_profiles
+  weight: 5
+
+ai_qa_gate.admin_settings:
+  title: 'Settings'
+  route_name: ai_qa_gate.admin_settings
+  base_route: ai_qa_gate.admin_profiles
+  weight: 10
+
+# Node AI Review tab
+ai_qa_gate.node_review:
+  title: 'AI Review'
+  route_name: ai_qa_gate.node_review
+  base_route: entity.node.canonical
+  weight: 100
+

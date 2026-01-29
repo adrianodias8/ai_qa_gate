@@ -1,0 +1,51 @@
+id: ec_accessibility_clarity
+label: 'EC Accessibility and Clarity'
+policy_text: |
+  ## Accessibility and Clarity Standards
+
+  ### Plain Language
+  - Use clear, straightforward language
+  - Define technical terms on first use
+  - Expand acronyms on first use (e.g., "Digital Services Act (DSA)")
+  - Avoid jargon where possible; explain it where necessary
+
+  ### Structure
+  - Use logical paragraph organization
+  - Lead with key information
+  - Use headings to organize content
+  - Keep sentences reasonably short (aim for under 25 words)
+
+  ### Acronym Handling
+  - Always expand acronyms on first use
+  - Consider maintaining a glossary for recurring terms
+  - Do not assume reader familiarity with EU-specific abbreviations
+
+  ### Inclusive Language
+  - Use gender-neutral language
+  - Avoid assumptions about reader background
+  - Be mindful of cultural and linguistic diversity
+
+  ### Technical Content
+  - Provide context for technical requirements
+  - Link to additional resources for complex topics
+  - Use examples to illustrate abstract concepts
+
+examples_good: |
+  GOOD: "The Digital Services Act (DSA) establishes rules for online platforms. The DSA requires..."
+  GOOD: "Providers must implement measures to address illegal content—material that violates applicable laws."
+  GOOD: "Very Large Online Platforms (VLOPs) are services with more than 45 million monthly active users in the EU."
+
+examples_bad: |
+  BAD: "The DSA, DMA, GDPR and NIS2 create a comprehensive framework..." (undefined acronyms)
+  BAD: "Providers must ensure interoperability of ancillary services pursuant to ex ante obligations." (jargon-heavy)
+  BAD: "See Art. 6(1)(a) GDPR." (assumes legal familiarity)
+
+disallowed_phrases: ''
+
+required_disclaimers: ''
+
+metadata:
+  jurisdiction: EU
+  audience: general
+  version: '1.0'
+

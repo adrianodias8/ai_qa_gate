@@ -1,0 +1,216 @@
+# Schema for AI QA Gate module
+
+ai_qa_gate.qa_profile.*:
+  type: config_entity
+  label: 'QA Profile'
+  mapping:
+    id:
+      type: string
+      label: 'Machine name'
+    label:
+      type: label
+      label: 'Label'
+    enabled:
+      type: boolean
+      label: 'Enabled'
+    target_entity_type_id:
+      type: string
+      label: 'Target entity type ID'
+    target_bundle:
+      type: string
+      label: 'Target bundle'
+    fields_to_analyze:
+      type: sequence
+      label: 'Fields to analyze'
+      sequence:
+        type: mapping
+        label: 'Field configuration'
+        mapping:
+          field_name:
+            type: string
+            label: 'Field name'
+          weight:
+            type: integer
+            label: 'Weight'
+          include_label:
+            type: boolean
+            label: 'Include field label'
+          include_referenced_labels:
+            type: boolean
+            label: 'Include referenced entity labels'
+          strip_html:
+            type: boolean
+            label: 'Strip HTML tags'
+    include_meta:
+      type: mapping
+      label: 'Include metadata'
+      mapping:
+        include_entity_label:
+          type: boolean
+          label: 'Include entity label'
+        include_langcode:
+          type: boolean
+          label: 'Include language code'
+        include_bundle:
+          type: boolean
+          label: 'Include bundle'
+        include_moderation_state:
+          type: boolean
+          label: 'Include moderation state'
+        include_taxonomy_labels:
+          type: boolean
+          label: 'Include taxonomy labels'
+    policy_ids:
+      type: sequence
+      label: 'Policy IDs'
+      sequence:
+        type: string
+        label: 'Policy ID'
+    reports_enabled:
+      type: sequence
+      label: 'Enabled reports'
+      sequence:
+        type: mapping
+        label: 'Report configuration'
+        mapping:
+          plugin_id:
+            type: string
+            label: 'Plugin ID'
+          enabled:
+            type: boolean
+            label: 'Enabled'
+          configuration:
+            type: ignore
+            label: 'Plugin configuration'
+    ai_settings:
+      type: mapping
+      label: 'AI settings'
+      mapping:
+        provider_id:
+          type: string
+          label: 'Provider ID'
+          nullable: true
+        model:
+          type: string
+          label: 'Model'
+          nullable: true
+        temperature:
+          type: float
+          label: 'Temperature'
+          nullable: true
+        max_tokens:
+          type: integer
+          label: 'Max tokens'
+          nullable: true
+    execution_settings:
+      type: mapping
+      label: 'Execution settings'
+      mapping:
+        run_mode:
+          type: string
+          label: 'Run mode'
+        cache_ttl_seconds:
+          type: integer
+          label: 'Cache TTL in seconds'
+    gating_settings:
+      type: mapping
+      label: 'Gating settings'
+      mapping:
+        gating_enabled:
+          type: boolean
+          label: 'Gating enabled'
+        severity_threshold:
+          type: string
+          label: 'Severity threshold'
+        apply_to_states:
+          type: sequence
+          label: 'Apply to states'
+          sequence:
+            type: string
+            label: 'State ID'
+        block_transition_ids:
+          type: sequence
+          label: 'Block transition IDs'
+          sequence:
+            type: string
+            label: 'Transition ID'
+        require_acknowledgement:
+          type: boolean
+          label: 'Require acknowledgement'
+        acknowledgement_field:
+          type: string
+          label: 'Acknowledgement field'
+          nullable: true
+    access_settings:
+      type: mapping
+      label: 'Access settings'
+      mapping:
+        roles_allowed_to_run:
+          type: sequence
+          label: 'Roles allowed to run'
+          sequence:
+            type: string
+            label: 'Role ID'
+
+ai_qa_gate.qa_policy.*:
+  type: config_entity
+  label: 'QA Policy'
+  mapping:
+    id:
+      type: string
+      label: 'Machine name'
+    label:
+      type: label
+      label: 'Label'
+    policy_text:
+      type: text
+      label: 'Policy text'
+    examples_good:
+      type: text
+      label: 'Good examples'
+    examples_bad:
+      type: text
+      label: 'Bad examples'
+    disallowed_phrases:
+      type: text
+      label: 'Disallowed phrases'
+    required_disclaimers:
+      type: text
+      label: 'Required disclaimers'
+    metadata:
+      type: mapping
+      label: 'Metadata'
+      mapping:
+        jurisdiction:
+          type: string
+          label: 'Jurisdiction'
+        audience:
+          type: string
+          label: 'Audience'
+        version:
+          type: string
+          label: 'Version'
+
+ai_qa_gate.settings:
+  type: config_object
+  label: 'AI QA Gate settings'
+  mapping:
+    default_run_mode:
+      type: string
+      label: 'Default run mode'
+    log_ai_requests:
+      type: boolean
+      label: 'Log AI requests'
+    plugin_backoff_seconds:
+      type: integer
+      label: 'Backoff seconds between plugin runs'
+    retry_on_rate_limit:
+      type: boolean
+      label: 'Retry on rate limit errors'
+    max_retries:
+      type: integer
+      label: 'Maximum retry attempts'
+    retry_backoff_multiplier:
+      type: float
+      label: 'Retry backoff multiplier'
+

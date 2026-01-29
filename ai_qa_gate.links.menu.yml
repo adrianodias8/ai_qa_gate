@@ -1,0 +1,7 @@
+ai_qa_gate.admin:
+  title: 'AI QA Gate'
+  description: 'Configure AI-powered content quality assurance profiles and policies.'
+  route_name: ai_qa_gate.admin_profiles
+  parent: system.admin_config
+  weight: 50
+

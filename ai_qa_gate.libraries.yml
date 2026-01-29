@@ -1,0 +1,6 @@
+ai_review:
+  version: 1.x
+  css:
+    component:
+      css/ai_review.css: {}
+

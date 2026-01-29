@@ -1,0 +1,90 @@
+{#
+/**
+ * @file
+ * Template for the AI QA Gate review page.
+ *
+ * Available variables:
+ * - entity: The entity being reviewed.
+ * - profile: The QA profile.
+ * - qa_run: The latest QA run, if any.
+ * - is_stale: Whether the run results are stale.
+ * - findings_by_category: Findings grouped by category.
+ * - summary: The overall summary.
+ * - can_run: Whether the user can run analysis.
+ */
+#}
+<div class="ai-qa-gate-review">
+  {% if profile %}
+    <details class="ai-qa-gate-profile">
+      <summary>{{ 'QA Profile: @label'|t({'@label': profile.label}) }}</summary>
+      <ul>
+        <li>{{ 'Target: @type / @bundle'|t({'@type': profile.target_entity_type_id, '@bundle': profile.target_bundle ?: 'All bundles'|t}) }}</li>
+      </ul>
+    </details>
+
+    {% if is_stale %}
+      <div class="messages messages--warning">
+        {{ 'Content has changed since the last analysis. The results below may be outdated.'|t }}
+      </div>
+    {% endif %}
+
+    {% if qa_run %}
+      <div class="ai-qa-gate-run-info">
+        <p>
+          <strong>{{ 'Last run:'|t }}</strong>
+          <span class="status-{{ qa_run.status }}">{{ qa_run.status|capitalize }}</span>
+          - {{ qa_run.executed_at|date('Y-m-d H:i:s') }}
+        </p>
+        {% if qa_run.provider_id %}
+          <p>{{ 'Provider: @provider / @model'|t({'@provider': qa_run.provider_id, '@model': qa_run.model}) }}</p>
+        {% endif %}
+      </div>
+
+      {% if summary %}
+        <div class="ai-qa-gate-summary">
+          <h3>{{ 'Summary'|t }}</h3>
+          <p>{{ summary.summary }}</p>
+          <ul>
+            <li>{{ 'High: @count'|t({'@count': summary.counts.high}) }}</li>
+            <li>{{ 'Medium: @count'|t({'@count': summary.counts.medium}) }}</li>
+            <li>{{ 'Low: @count'|t({'@count': summary.counts.low}) }}</li>
+          </ul>
+        </div>
+      {% endif %}
+
+      {% if findings_by_category %}
+        <div class="ai-qa-gate-findings">
+          <h3>{{ 'Findings'|t }}</h3>
+          {% for category, findings in findings_by_category %}
+            <details open>
+              <summary>{{ category|capitalize }} ({{ findings|length }})</summary>
+              {% for finding in findings %}
+                <div class="ai-qa-gate-finding finding-{{ finding.severity }}">
+                  <span class="severity-{{ finding.severity }}">[{{ finding.severity|upper }}]</span>
+                  <strong>{{ finding.title }}</strong>
+                  <p>{{ finding.explanation }}</p>
+                  {% if finding.evidence.excerpt %}
+                    <div class="finding-evidence">
+                      <em>{{ 'Evidence:'|t }}</em>
+                      <blockquote>{{ finding.evidence.excerpt }}</blockquote>
+                    </div>
+                  {% endif %}
+                  {% if finding.suggested_fix %}
+                    <p><em>{{ 'Suggested fix:'|t }}</em> {{ finding.suggested_fix }}</p>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </details>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="messages messages--status">
+        {{ 'No AI QA analysis has been run for this content yet.'|t }}
+      </div>
+    {% endif %}
+  {% else %}
+    <p>{{ 'No QA profile is configured for this content type.'|t }}</p>
+  {% endif %}
+</div>
+

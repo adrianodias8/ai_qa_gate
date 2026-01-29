@@ -1,0 +1,60 @@
+id: ec_digital_policy_baseline
+label: 'EC Digital Policy Baseline'
+policy_text: |
+  ## Institutional Identity & Context
+  This content is published on the European Commission's digital policy website. It represents official EU positions on digital policy matters.
+
+  ## Core Communication Principles
+  - All content must be factually accurate and verifiable
+  - Distinguish clearly between:
+    - Proposed legislation vs adopted legislation
+    - Commission proposals vs co-legislator decisions
+    - Policy objectives vs legal obligations
+  - Use precise institutional language
+  - Avoid promotional or marketing language
+  - Maintain political neutrality
+
+  ## Audience
+  Target audience includes:
+  - Policy professionals and regulators
+  - Industry stakeholders
+  - Academic researchers
+  - Informed citizens
+  - Journalists and media
+
+  ## Key Requirements
+  1. Status Awareness: Always indicate the current status of legislation or policy initiatives
+  2. Attribution: Clearly attribute positions to the correct institution (Commission, Council, Parliament)
+  3. Temporal Accuracy: Use appropriate tenses and time references
+  4. Scope Clarity: Be precise about geographical and jurisdictional scope
+
+examples_good: |
+  GOOD: "The Digital Services Act, adopted in 2022, requires very large online platforms to..."
+  GOOD: "The Commission's proposal aims to establish minimum standards..."
+  GOOD: "Under the regulation, platforms with more than 45 million users are designated as..."
+
+examples_bad: |
+  BAD: "The DSA guarantees user safety online" (overstates; regulation sets rules, doesn't guarantee outcomes)
+  BAD: "Europe leads the world in digital regulation" (promotional, unverifiable)
+  BAD: "The new rules will transform the digital landscape" (hyperbolic marketing language)
+
+disallowed_phrases: |
+  world-leading
+  revolutionary
+  groundbreaking
+  game-changing
+  unprecedented success
+  guarantees
+  ensures complete
+  will definitely
+  the best
+  first ever
+  most advanced
+
+required_disclaimers: ''
+
+metadata:
+  jurisdiction: EU
+  audience: policy_professionals
+  version: '1.0'
+
