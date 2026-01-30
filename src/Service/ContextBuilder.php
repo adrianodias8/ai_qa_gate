@@ -56,10 +56,16 @@ class ContextBuilder implements ContextBuilderInterface {
   public function computeInputHash(EntityInterface $entity, QaProfileInterface $profile): string {
     $context = $this->buildContext($entity, $profile);
 
-    // Build hash input from combined text, meta subset, profile ID, and report plugin IDs.
+    // Exclude volatile lifecycle metadata that changes between when the QA run
+    // is created and when gating is checked (e.g. moderation_state changes
+    // during the transition being gated, revision_id changes on save).
+    $meta = $context['meta'];
+    unset($meta['moderation_state'], $meta['revision_id']);
+
+    // Build hash input from combined text, stable meta, profile ID, and report plugin IDs.
     $hashInput = [
       'combined_text' => $context['combined_text'],
-      'meta' => $context['meta'],
+      'meta' => $meta,
       'profile_id' => $profile->id(),
       'report_plugin_ids' => $profile->getEnabledReportPluginIds(),
     ];
