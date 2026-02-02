@@ -1,0 +1,30 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_style_guide_accessibility_inclusivity
+label: 'Style Guide - Accessibility and Inclusivity Review'
+description: 'Ensure language is inclusive and accessible to all users.'
+content: |
+  ## Accessibility and Inclusivity Review
+
+  Ensure language is inclusive and accessible to all users. Use gender-neutral terms and singular "they". Provide meaningful alt text for all images. Avoid cultural references, idioms, and regional slang unfamiliar to international users.
+
+  ### Good Examples
+  - "The police officer filed the report promptly."
+  - "Each visitor should ensure they have their ID badge."
+  - "If you wish to complain, you must first contact the national authorities."
+  - `<img src="map.png" alt="Map showing EU member countries">`
+  - "Learn more about the €15.5 billion renewable energy campaign in Africa"
+
+  ### Bad Examples
+  - "The chairman will announce his decision tomorrow."
+  - "If a customer wishes to complain, he must contact the authorities."
+  - "Our app is so easy your grandma could use it!"
+  - `<img src="chart.png" alt="">`
+
+  ### Disallowed Phrases
+  - Gender-specific job titles ("policeman," "chairman")
+  - "He or she," "(s)he"
+  - Slang and idioms (e.g. "kick the bucket")
+  - Derogatory or exclusive language
+tags: []

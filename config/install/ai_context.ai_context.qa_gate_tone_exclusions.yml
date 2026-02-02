@@ -1,0 +1,12 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_gate_tone_exclusions
+label: 'QA Gate: Tone - False Positive Exclusions'
+description: 'Patterns that should NOT be flagged by the Tone & Neutrality analyzer.'
+content: |
+  ## False Positive Exclusions
+
+  The following patterns have been reviewed by editors and should NOT be flagged.
+  Do not report findings similar to these examples.
+tags: []

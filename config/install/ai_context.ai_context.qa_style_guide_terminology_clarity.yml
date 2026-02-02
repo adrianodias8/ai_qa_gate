@@ -1,0 +1,29 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_style_guide_terminology_clarity
+label: 'Style Guide - Terminology and Clarity Review'
+description: 'Ensure text uses consistent, plain terminology and avoids jargon.'
+content: |
+  ## Terminology and Clarity Review
+
+  Ensure text uses consistent, plain terminology and avoids jargon. Define acronyms on first use. Replace technical or formal terms with simpler alternatives. Reword or break down long sentences. Avoid repetition and ambiguous references.
+
+  ### Good Examples
+  - Use "started sharing information about..." instead of "commenced dissemination of information pertaining to..."
+  - Use "Small businesses should read the documentation..." instead of "SME stakeholders should peruse documentation..."
+  - Explain legal citations in plain language
+  - Use positive phrasing instead of double negatives
+
+  ### Bad Examples
+  - "Commenced dissemination of information pertaining to..." (overly formal)
+  - "SME stakeholders should peruse documentation..." (jargon-heavy)
+  - Full legal citations without explanation
+  - "Not unlikely," "not less than" (double negatives)
+
+  ### Disallowed Patterns
+  - Unexplained acronyms
+  - Bureaucratic constructions ("in accordance with," "undertake an analysis")
+  - Double negatives
+  - Inconsistent spellings (e.g., "organize" and "organise")
+tags: []

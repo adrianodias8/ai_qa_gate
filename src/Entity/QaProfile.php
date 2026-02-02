@@ -41,9 +41,7 @@ use Drupal\Core\Config\Entity\ConfigEntityBase;
  *     "target_bundle",
  *     "fields_to_analyze",
  *     "include_meta",
- *     "policy_ids",
- *     "reports_enabled",
- *     "ai_settings",
+ *     "agents_enabled",
  *     "execution_settings",
  *     "gating_settings",
  *     "access_settings",
@@ -114,30 +112,11 @@ class QaProfile extends ConfigEntityBase implements QaProfileInterface {
   ];
 
   /**
-   * Policy IDs to inject.
+   * Enabled agent IDs.
    *
    * @var array
    */
-  protected array $policy_ids = [];
-
-  /**
-   * Enabled reports configuration.
-   *
-   * @var array
-   */
-  protected array $reports_enabled = [];
-
-  /**
-   * AI settings.
-   *
-   * @var array
-   */
-  protected array $ai_settings = [
-    'provider_id' => NULL,
-    'model' => NULL,
-    'temperature' => NULL,
-    'max_tokens' => NULL,
-  ];
+  protected array $agents_enabled = [];
 
   /**
    * Execution settings.
@@ -216,27 +195,8 @@ class QaProfile extends ConfigEntityBase implements QaProfileInterface {
   /**
    * {@inheritdoc}
    */
-  public function getPolicyIds(): array {
-    return $this->policy_ids;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getReportsEnabled(): array {
-    return $this->reports_enabled;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getAiSettings(): array {
-    return $this->ai_settings + [
-      'provider_id' => NULL,
-      'model' => NULL,
-      'temperature' => NULL,
-      'max_tokens' => NULL,
-    ];
+  public function getAgentsEnabled(): array {
+    return $this->agents_enabled;
   }
 
   /**
@@ -332,39 +292,6 @@ class QaProfile extends ConfigEntityBase implements QaProfileInterface {
     return $settings['block_transition_ids'] ?? [];
   }
 
-  /**
-   * Gets enabled report plugin IDs.
-   *
-   * @return array
-   *   Array of enabled plugin IDs.
-   */
-  public function getEnabledReportPluginIds(): array {
-    $enabled = [];
-    foreach ($this->reports_enabled as $report) {
-      if (!empty($report['enabled'])) {
-        $enabled[] = $report['plugin_id'];
-      }
-    }
-    return $enabled;
-  }
-
-  /**
-   * Gets configuration for a specific report plugin.
-   *
-   * @param string $plugin_id
-   *   The plugin ID.
-   *
-   * @return array
-   *   The plugin configuration.
-   */
-  public function getReportPluginConfiguration(string $plugin_id): array {
-    foreach ($this->reports_enabled as $report) {
-      if ($report['plugin_id'] === $plugin_id) {
-        return $report['configuration'] ?? [];
-      }
-    }
-    return [];
-  }
 
 }
 

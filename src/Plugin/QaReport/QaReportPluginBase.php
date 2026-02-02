@@ -91,6 +91,31 @@ abstract class QaReportPluginBase extends PluginBase implements QaReportPluginIn
   /**
    * {@inheritdoc}
    */
+  public function buildSystemMessage(): string {
+    return '';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function buildUserMessage(array $context, array $configuration): string {
+    return '';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function buildPrompt(array $context, array $configuration): array {
+    return [
+      'system_message' => $this->buildSystemMessage(),
+      'user_message' => $this->buildUserMessage($context, $configuration),
+      'output_schema_description' => $this->buildOutputFormatInstructions(),
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state): array {
     // Default implementation returns an empty form.
     // Plugins should override this to provide their configuration options.

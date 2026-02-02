@@ -90,23 +90,7 @@ class AccessibilityClarity extends QaReportPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function buildPrompt(array $context, array $configuration): array {
-    $systemMessage = $this->buildSystemMessage($context);
-    $userMessage = $this->buildUserMessage($context, $configuration);
-
-    return [
-      'system_message' => $systemMessage,
-      'user_message' => $userMessage,
-      'output_schema_description' => $this->buildOutputFormatInstructions(),
-    ];
-  }
-
-  /**
-   * Builds the system message.
-   */
-  protected function buildSystemMessage(array $context): string {
-    $policies = $context['policies'] ?? '';
-
+  public function buildSystemMessage(): string {
     return <<<EOT
 You are an expert content reviewer specializing in accessibility and clarity of institutional communications. Your task is to analyze content for readability and plain language compliance.
 
@@ -127,15 +111,13 @@ You are an expert content reviewer specializing in accessibility and clarity of 
 - **HIGH**: Critical acronyms unexpanded, impenetrable jargon, severely unclear passages
 - **MEDIUM**: Some unexpanded acronyms, moderate jargon usage, occasionally complex sentences
 - **LOW**: Minor clarity issues, stylistic improvements possible, edge-case acronyms
-
-{$policies}
 EOT;
   }
 
   /**
-   * Builds the user message.
+   * {@inheritdoc}
    */
-  protected function buildUserMessage(array $context, array $configuration): string {
+  public function buildUserMessage(array $context, array $configuration): string {
     $meta = $context['meta'] ?? [];
     $combinedText = $context['combined_text'] ?? '';
     $maxSentenceWords = $configuration['max_sentence_words'] ?? 25;

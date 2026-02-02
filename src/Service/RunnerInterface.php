@@ -77,54 +77,54 @@ interface RunnerInterface {
   public function getApplicableProfile(EntityInterface $entity): ?QaProfileInterface;
 
   /**
-   * Runs a single plugin for an entity.
+   * Runs a single agent for an entity.
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity to analyze.
    * @param string $profile_id
    *   The profile ID to use.
-   * @param string $plugin_id
-   *   The plugin ID to run.
+   * @param string $agent_id
+   *   The agent ID to run.
    * @param bool $force
    *   Whether to force a new run even if a recent one exists.
    *
    * @return \Drupal\ai_qa_gate\Entity\QaRunInterface
    *   The QA run result.
    */
-  public function runPlugin(EntityInterface $entity, string $profile_id, string $plugin_id, bool $force = FALSE): QaRunInterface;
+  public function runAgent(EntityInterface $entity, string $profile_id, string $agent_id, bool $force = FALSE): QaRunInterface;
 
   /**
-   * Queues a single plugin for an entity.
+   * Queues a single agent for an entity.
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity to analyze.
    * @param string $profile_id
    *   The profile ID to use.
-   * @param string $plugin_id
-   *   The plugin ID to run.
+   * @param string $agent_id
+   *   The agent ID to run.
    *
    * @return \Drupal\ai_qa_gate\Entity\QaRunInterface
    *   The pending QA run.
    */
-  public function queuePlugin(EntityInterface $entity, string $profile_id, string $plugin_id): QaRunInterface;
+  public function queueAgent(EntityInterface $entity, string $profile_id, string $agent_id): QaRunInterface;
 
   /**
-   * Executes a single plugin for a QA run.
+   * Executes a single agent for a QA run.
    *
    * @param \Drupal\ai_qa_gate\Entity\QaRunInterface $qa_run
    *   The QA run.
-   * @param string $plugin_id
-   *   The plugin ID to execute.
+   * @param string $agent_id
+   *   The agent ID to execute.
    * @param int $retry_count
    *   Current retry count for rate limit handling.
    *
    * @return array
    *   Array with keys 'status', 'findings', 'error', 'provider_id', 'model'.
    */
-  public function executePlugin(QaRunInterface $qa_run, string $plugin_id, int $retry_count = 0): array;
+  public function executeAgent(QaRunInterface $qa_run, string $agent_id, int $retry_count = 0): array;
 
   /**
-   * Queues all plugins for an entity (per-plugin queue items).
+   * Queues all agents for an entity (per-agent queue items).
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity to analyze.
@@ -134,7 +134,6 @@ interface RunnerInterface {
    * @return \Drupal\ai_qa_gate\Entity\QaRunInterface
    *   The pending QA run.
    */
-  public function queueAllPlugins(EntityInterface $entity, string $profile_id): QaRunInterface;
+  public function queueAllAgents(EntityInterface $entity, string $profile_id): QaRunInterface;
 
 }
-

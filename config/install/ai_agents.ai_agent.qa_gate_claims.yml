@@ -1,0 +1,27 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_gate_claims
+label: 'QA Gate: Claims & Regulatory Precision'
+description: 'Analyzes content for legislative accuracy, regulatory precision, and proper institutional references.'
+system_prompt: "You are an expert content reviewer specializing in EU/EC policy communications. Your task is to analyze content for claims accuracy, legislative precision, and regulatory compliance.\n\n## Your Role\n- Identify inaccurate, overstated, or misleading claims\n- Flag absolute statements that require caveats\n- Check for proper distinction between proposed vs adopted legislation\n- Verify attribution to correct institutions\n- Identify potential legal interpretation issues\n\n## Analysis Categories\n1. **Absolute Claims**: Statements using \"guarantees\", \"ensures\", \"will definitely\" without proper caveats\n2. **Legislative Status**: Incorrect or unclear indication of legislation status (proposal/adopted/in force)\n3. **Legal Interpretation**: Statements that make definitive legal interpretations without authority\n4. **Attribution**: Incorrect attribution of positions or actions to institutions\n5. **Scope Overreach**: Claims that extend beyond actual regulatory scope\n\n## Severity Guidelines\n- **HIGH**: Factually incorrect claims, wrong legislative status, serious attribution errors\n- **MEDIUM**: Overstated claims, missing important caveats, unclear status indicators\n- **LOW**: Minor precision issues, stylistic concerns, potential ambiguities"
+secured_system_prompt: '[ai_agent:agent_instructions]'
+tools: {  }
+orchestration_agent: false
+triage_agent: false
+max_loops: 1
+default_information_tools: '[]'
+tool_usage_limits: {  }
+tool_settings: {  }
+masquerade_roles: {  }
+exclude_users_role: false
+structured_output_enabled: true
+structured_output_schema: "{\n  \"name\": \"qa_findings\",\n  \"schema\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"findings\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"category\": {\"type\": \"string\"},\n            \"severity\": {\"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\"]},\n            \"title\": {\"type\": \"string\"},\n            \"explanation\": {\"type\": \"string\"},\n            \"evidence\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"field\": {\"type\": \"string\"},\n                \"excerpt\": {\"type\": \"string\"},\n                \"start\": {\"type\": [\"integer\", \"null\"]},\n                \"end\": {\"type\": [\"integer\", \"null\"]}\n              },\n              \"required\": [\"field\", \"excerpt\"]\n            },\n            \"suggested_fix\": {\"type\": [\"string\", \"null\"]},\n            \"confidence\": {\"type\": \"number\", \"minimum\": 0, \"maximum\": 1}\n          },\n          \"required\": [\"category\", \"severity\", \"title\", \"explanation\", \"evidence\", \"confidence\"]\n        }\n      }\n    },\n    \"required\": [\"findings\"]\n  }\n}"
+third_party_settings:
+  ai_qa_gate:
+    qa_report_plugin_id: claims_regulatory_precision
+    qa_report_configuration:
+      check_absolute_claims: true
+      check_legislative_status: true
+      check_legal_interpretation: true
+      check_attribution: true

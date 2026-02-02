@@ -186,6 +186,147 @@ function ai_qa_gate_entity_form_validate(array &$form, FormStateInterface $form_
 }
 
 /**
+ * Implements hook_form_FORM_ID_alter() for ai_agent_edit_form.
+ */
+function ai_qa_gate_form_ai_agent_edit_form_alter(array &$form, FormStateInterface $form_state, string $form_id): void {
+  _ai_qa_gate_alter_agent_form($form, $form_state);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for ai_agent_add_form.
+ */
+function ai_qa_gate_form_ai_agent_add_form_alter(array &$form, FormStateInterface $form_state, string $form_id): void {
+  _ai_qa_gate_alter_agent_form($form, $form_state);
+}
+
+/**
+ * Adds QA Report plugin configuration to the AI Agent form.
+ *
+ * @param array $form
+ *   The form array.
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ *   The form state.
+ */
+function _ai_qa_gate_alter_agent_form(array &$form, FormStateInterface $form_state): void {
+  /** @var \Drupal\ai_qa_gate\QaReportPluginManager $pluginManager */
+  $pluginManager = \Drupal::service('plugin.manager.qa_report');
+
+  $formObject = $form_state->getFormObject();
+  /** @var \Drupal\Core\Config\Entity\ConfigEntityInterface $entity */
+  $entity = $formObject->getEntity();
+
+  // Read current third_party_settings.
+  $currentPluginId = $entity->getThirdPartySetting('ai_qa_gate', 'qa_report_plugin_id', '');
+  $currentConfig = $entity->getThirdPartySetting('ai_qa_gate', 'qa_report_configuration', []);
+
+  // Build plugin options.
+  $pluginDefinitions = $pluginManager->getDefinitions();
+  $pluginOptions = ['' => t('- None -')];
+  foreach ($pluginDefinitions as $id => $definition) {
+    $pluginOptions[$id] = $definition['label'] ?? $id;
+  }
+
+  // Check form_state for AJAX rebuild.
+  $selectedPluginId = $form_state->getValue('qa_report_plugin_id') ?? $currentPluginId;
+
+  $form['ai_qa_gate'] = [
+    '#type' => 'details',
+    '#title' => t('QA Report Plugin'),
+    '#description' => t('Associate a QA Report plugin with this agent. The plugin defines analysis behavior and the system prompt for QA analysis.'),
+    '#tree' => FALSE,
+    '#weight' => 90,
+  ];
+
+  $form['ai_qa_gate']['qa_report_plugin_id'] = [
+    '#type' => 'select',
+    '#title' => t('QA Report plugin'),
+    '#options' => $pluginOptions,
+    '#default_value' => $selectedPluginId,
+    '#ajax' => [
+      'callback' => '_ai_qa_gate_agent_plugin_ajax',
+      'wrapper' => 'qa-report-plugin-config',
+      'event' => 'change',
+    ],
+  ];
+
+  $form['ai_qa_gate']['qa_report_configuration_wrapper'] = [
+    '#type' => 'container',
+    '#attributes' => ['id' => 'qa-report-plugin-config'],
+  ];
+
+  // Show plugin-specific configuration form.
+  if (!empty($selectedPluginId) && isset($pluginDefinitions[$selectedPluginId])) {
+    try {
+      $plugin = $pluginManager->createInstance($selectedPluginId, $currentConfig);
+      $configForm = $plugin->buildConfigurationForm([], $form_state);
+      if (!empty($configForm)) {
+        $form['ai_qa_gate']['qa_report_configuration_wrapper']['qa_report_configuration'] = [
+          '#type' => 'fieldset',
+          '#title' => t('Plugin configuration'),
+          '#tree' => TRUE,
+        ];
+        foreach ($configForm as $key => $element) {
+          if (str_starts_with($key, '#')) {
+            continue;
+          }
+          $form['ai_qa_gate']['qa_report_configuration_wrapper']['qa_report_configuration'][$key] = $element;
+        }
+      }
+    }
+    catch (\Exception $e) {
+      // Skip configuration form on error.
+    }
+  }
+
+  $form['ai_qa_gate']['sync_system_prompt'] = [
+    '#type' => 'checkbox',
+    '#title' => t('Sync system prompt from plugin'),
+    '#description' => t('When checked, saving this form will overwrite the system prompt field with the prompt defined by the selected QA Report plugin.'),
+    '#default_value' => FALSE,
+    '#states' => [
+      'visible' => [
+        ':input[name="qa_report_plugin_id"]' => ['!value' => ''],
+      ],
+    ],
+  ];
+
+  $form['#entity_builders'][] = '_ai_qa_gate_agent_entity_builder';
+}
+
+/**
+ * AJAX callback for QA Report plugin selection on AI Agent form.
+ */
+function _ai_qa_gate_agent_plugin_ajax(array &$form, FormStateInterface $form_state): array {
+  return $form['ai_qa_gate']['qa_report_configuration_wrapper'];
+}
+
+/**
+ * Entity builder callback for AI Agent form.
+ *
+ * Saves QA Report plugin settings as third_party_settings on the agent.
+ */
+function _ai_qa_gate_agent_entity_builder(string $entity_type, $entity, array &$form, FormStateInterface $form_state): void {
+  $pluginId = $form_state->getValue('qa_report_plugin_id');
+
+  if (!empty($pluginId)) {
+    $entity->setThirdPartySetting('ai_qa_gate', 'qa_report_plugin_id', $pluginId);
+    $entity->setThirdPartySetting('ai_qa_gate', 'qa_report_configuration', $form_state->getValue('qa_report_configuration') ?? []);
+
+    // Optionally sync system prompt from plugin.
+    if ($form_state->getValue('sync_system_prompt')) {
+      /** @var \Drupal\ai_qa_gate\QaReportPluginManager $pluginManager */
+      $pluginManager = \Drupal::service('plugin.manager.qa_report');
+      $plugin = $pluginManager->createInstance($pluginId);
+      $entity->set('system_prompt', $plugin->buildSystemMessage());
+    }
+  }
+  else {
+    $entity->unsetThirdPartySetting('ai_qa_gate', 'qa_report_plugin_id');
+    $entity->unsetThirdPartySetting('ai_qa_gate', 'qa_report_configuration');
+  }
+}
+
+/**
  * Implements hook_theme().
  */
 function ai_qa_gate_theme(): array {

@@ -75,23 +75,7 @@ class PiiPolicy extends QaReportPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function buildPrompt(array $context, array $configuration): array {
-    $systemMessage = $this->buildSystemMessage($context);
-    $userMessage = $this->buildUserMessage($context, $configuration);
-
-    return [
-      'system_message' => $systemMessage,
-      'user_message' => $userMessage,
-      'output_schema_description' => $this->buildOutputFormatInstructions(),
-    ];
-  }
-
-  /**
-   * Builds the system message.
-   */
-  protected function buildSystemMessage(array $context): string {
-    $policies = $context['policies'] ?? '';
-
+  public function buildSystemMessage(): string {
     return <<<EOT
 You are an expert content reviewer specializing in privacy and policy compliance. Your task is to analyze content for PII exposure and policy violations.
 
@@ -116,15 +100,13 @@ You are an expert content reviewer specializing in privacy and policy compliance
 - **HIGH**: Clear PII exposure (personal emails, phone numbers, ID numbers), confidential content
 - **MEDIUM**: Internal references, draft markers, ambiguous personal information
 - **LOW**: Minor policy concerns, edge cases, potential improvements
-
-{$policies}
 EOT;
   }
 
   /**
-   * Builds the user message.
+   * {@inheritdoc}
    */
-  protected function buildUserMessage(array $context, array $configuration): string {
+  public function buildUserMessage(array $context, array $configuration): string {
     $meta = $context['meta'] ?? [];
     $combinedText = $context['combined_text'] ?? '';
 

@@ -4,13 +4,6 @@ services:
     class: Drupal\ai_qa_gate\QaReportPluginManager
     parent: default_plugin_manager
 
-  # AI Client
-  ai_qa_gate.ai_client:
-    class: Drupal\ai_qa_gate\AiClient\AiClientFactory
-    arguments:
-      - '@module_handler'
-      - '@service_container'
-
   # Context Builder Service
   ai_qa_gate.context_builder:
     class: Drupal\ai_qa_gate\Service\ContextBuilder
@@ -25,13 +18,14 @@ services:
     arguments:
       - '@entity_type.manager'
       - '@ai_qa_gate.context_builder'
-      - '@ai_qa_gate.ai_client'
+      - '@plugin.manager.ai_agents'
       - '@plugin.manager.qa_report'
       - '@queue'
       - '@current_user'
       - '@datetime.time'
       - '@logger.factory'
       - '@config.factory'
+      - '@ai.provider'
 
   # Gating Service
   ai_qa_gate.gating:
@@ -50,14 +44,6 @@ services:
     arguments:
       - '@entity_type.manager'
 
-  # Example Generator Service
-  ai_qa_gate.example_generator:
-    class: Drupal\ai_qa_gate\Service\ExampleGenerator
-    arguments:
-      - '@ai_qa_gate.ai_client'
-      - '@logger.factory'
-      - '@string_translation'
-
   # Access checker for AI Review tab
   ai_qa_gate.access_checker:
     class: Drupal\ai_qa_gate\Access\AiReviewAccessChecker
@@ -66,4 +52,3 @@ services:
       - '@current_user'
     tags:
       - { name: access_check, applies_to: _ai_qa_gate_review_access }
-

@@ -1,6 +1,10 @@
-id: ec_accessibility_clarity
+langcode: en
+status: true
+dependencies: {  }
+id: qa_ec_accessibility_clarity
 label: 'EC Accessibility and Clarity'
-policy_text: |
+description: 'Accessibility and clarity standards for plain language and inclusive communication.'
+content: |
   ## Accessibility and Clarity Standards
 
   ### Plain Language
@@ -30,22 +34,13 @@ policy_text: |
   - Link to additional resources for complex topics
   - Use examples to illustrate abstract concepts
 
-examples_good: |
-  GOOD: "The Digital Services Act (DSA) establishes rules for online platforms. The DSA requires..."
-  GOOD: "Providers must implement measures to address illegal content—material that violates applicable laws."
-  GOOD: "Very Large Online Platforms (VLOPs) are services with more than 45 million monthly active users in the EU."
+  ### Good Examples
+  - "The Digital Services Act (DSA) establishes rules for online platforms. The DSA requires..."
+  - "Providers must implement measures to address illegal content—material that violates applicable laws."
+  - "Very Large Online Platforms (VLOPs) are services with more than 45 million monthly active users in the EU."
 
-examples_bad: |
-  BAD: "The DSA, DMA, GDPR and NIS2 create a comprehensive framework..." (undefined acronyms)
-  BAD: "Providers must ensure interoperability of ancillary services pursuant to ex ante obligations." (jargon-heavy)
-  BAD: "See Art. 6(1)(a) GDPR." (assumes legal familiarity)
-
-disallowed_phrases: ''
-
-required_disclaimers: ''
-
-metadata:
-  jurisdiction: EU
-  audience: general
-  version: '1.0'
-
+  ### Bad Examples
+  - "The DSA, DMA, GDPR and NIS2 create a comprehensive framework..." (undefined acronyms)
+  - "Providers must ensure interoperability of ancillary services pursuant to ex ante obligations." (jargon-heavy)
+  - "See Art. 6(1)(a) GDPR." (assumes legal familiarity)
+tags: []

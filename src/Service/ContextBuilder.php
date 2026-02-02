@@ -40,13 +40,11 @@ class ContextBuilder implements ContextBuilderInterface {
     $meta = $this->buildMeta($entity, $profile);
     $fragments = $this->buildFragments($entity, $profile);
     $combinedText = $this->buildCombinedText($fragments);
-    $policies = $this->buildPoliciesContext($profile);
 
     return [
       'meta' => $meta,
       'fragments' => $fragments,
       'combined_text' => $combinedText,
-      'policies' => $policies,
     ];
   }
 
@@ -62,12 +60,12 @@ class ContextBuilder implements ContextBuilderInterface {
     $meta = $context['meta'];
     unset($meta['moderation_state'], $meta['revision_id']);
 
-    // Build hash input from combined text, stable meta, profile ID, and report plugin IDs.
+    // Build hash input from combined text, stable meta, profile ID, and agent IDs.
     $hashInput = [
       'combined_text' => $context['combined_text'],
       'meta' => $meta,
       'profile_id' => $profile->id(),
-      'report_plugin_ids' => $profile->getEnabledReportPluginIds(),
+      'agents_enabled' => $profile->getAgentsEnabled(),
     ];
 
     return hash('sha256', json_encode($hashInput));
@@ -350,36 +348,6 @@ class ContextBuilder implements ContextBuilderInterface {
     }
 
     return trim(implode("\n", $parts));
-  }
-
-  /**
-   * Builds policies context from profile.
-   *
-   * @param \Drupal\ai_qa_gate\Entity\QaProfileInterface $profile
-   *   The QA profile.
-   *
-   * @return string
-   *   The combined policy context.
-   */
-  protected function buildPoliciesContext(QaProfileInterface $profile): string {
-    $policyIds = $profile->getPolicyIds();
-    if (empty($policyIds)) {
-      return '';
-    }
-
-    $storage = $this->entityTypeManager->getStorage('qa_policy');
-    $policies = $storage->loadMultiple($policyIds);
-
-    $parts = [];
-    foreach ($policies as $policy) {
-      $parts[] = $policy->buildPromptContext();
-    }
-
-    if (empty($parts)) {
-      return '';
-    }
-
-    return "## Policy Guidelines\n\n" . implode("\n\n---\n\n", $parts);
   }
 
 }

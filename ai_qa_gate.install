@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 use Drupal\Core\Database\Database;
+use Drupal\taxonomy\Entity\Term;
 
 /**
  * Implements hook_schema().
@@ -29,6 +30,56 @@ function ai_qa_gate_install(): void {
   if (!\Drupal::moduleHandler()->moduleExists('ai')) {
     \Drupal::messenger()->addWarning(t('The AI module is not installed. AI QA Gate will not be able to run analyses until the AI module is installed and configured with a provider.'));
   }
+
+  // Register per-agent ai_context pools.
+  $config = \Drupal::configFactory()->getEditable('ai_context.agent_pools');
+  $agents = $config->get('agents') ?? [];
+
+  $pools = [
+    [
+      'id' => 'qa_gate_tone',
+      'contexts' => [
+        'qa_ec_neutral_tone',
+        'qa_style_guide_tone_voice',
+        'qa_gate_tone_exclusions',
+      ],
+      'always_include' => [],
+    ],
+    [
+      'id' => 'qa_gate_claims',
+      'contexts' => [
+        'qa_ec_legislative_precision',
+        'qa_ec_digital_policy_baseline',
+        'qa_gate_claims_exclusions',
+      ],
+      'always_include' => [],
+    ],
+    [
+      'id' => 'qa_gate_accessibility',
+      'contexts' => [
+        'qa_ec_accessibility_clarity',
+        'qa_style_guide_accessibility_inclusivity',
+        'qa_style_guide_terminology_clarity',
+        'qa_gate_accessibility_exclusions',
+      ],
+      'always_include' => [],
+    ],
+    [
+      'id' => 'qa_gate_pii',
+      'contexts' => [
+        'qa_gate_pii_exclusions',
+      ],
+      'always_include' => [],
+    ],
+  ];
+
+  foreach ($pools as $pool) {
+    $agents[] = $pool;
+  }
+  $config->set('agents', $agents)->save();
+
+  // Create taxonomy terms for ai_context tagging and assign to contexts.
+  _ai_qa_gate_create_context_tags();
 }
 
 /**
@@ -43,12 +94,94 @@ function ai_qa_gate_uninstall(): void {
     $config_factory->getEditable($config_name)->delete();
   }
 
-  // Delete all qa_policy configs.
-  foreach ($config_factory->listAll('ai_qa_gate.qa_policy.') as $config_name) {
-    $config_factory->getEditable($config_name)->delete();
-  }
-
   // Delete module settings.
   $config_factory->getEditable('ai_qa_gate.settings')->delete();
+
+  // Remove our agent pool entries from ai_context.agent_pools.
+  $poolConfig = $config_factory->getEditable('ai_context.agent_pools');
+  if ($poolConfig->get('agents')) {
+    $ourAgentIds = [
+      'qa_gate_tone',
+      'qa_gate_claims',
+      'qa_gate_accessibility',
+      'qa_gate_pii',
+    ];
+    $agents = array_filter(
+      (array) $poolConfig->get('agents'),
+      fn($agent) => !in_array($agent['id'] ?? '', $ourAgentIds, TRUE),
+    );
+    $poolConfig->set('agents', array_values($agents))->save();
+  }
+}
+
+/**
+ * Creates taxonomy terms for ai_context tagging and assigns them.
+ *
+ * Tags help admins categorize contexts in the UI and provide relevance
+ * scoring signals during context selection.
+ */
+function _ai_qa_gate_create_context_tags(): void {
+  $termStorage = \Drupal::entityTypeManager()->getStorage('taxonomy_term');
+
+  // Define the tags to create.
+  $tagNames = [
+    'qa',
+    'tone',
+    'claims',
+    'accessibility',
+    'pii',
+    'style-guide',
+    'ec-policy',
+    'exclusions',
+  ];
+
+  // Create terms and build a name-to-ID map.
+  $tagMap = [];
+  foreach ($tagNames as $name) {
+    // Check if term already exists.
+    $existing = $termStorage->loadByProperties([
+      'vid' => 'ai_context_tags',
+      'name' => $name,
+    ]);
+
+    if (!empty($existing)) {
+      $term = reset($existing);
+    }
+    else {
+      $term = Term::create([
+        'vid' => 'ai_context_tags',
+        'name' => $name,
+      ]);
+      $term->save();
+    }
+    $tagMap[$name] = (string) $term->id();
+  }
+
+  // Define context-to-tags mapping.
+  $contextTags = [
+    'qa_ec_neutral_tone' => ['qa', 'tone', 'ec-policy'],
+    'qa_ec_digital_policy_baseline' => ['qa', 'claims', 'ec-policy'],
+    'qa_ec_legislative_precision' => ['qa', 'claims', 'ec-policy'],
+    'qa_ec_accessibility_clarity' => ['qa', 'accessibility', 'ec-policy'],
+    'qa_style_guide_accessibility_inclusivity' => ['qa', 'accessibility', 'style-guide'],
+    'qa_style_guide_tone_voice' => ['qa', 'tone', 'style-guide'],
+    'qa_style_guide_seo_formatting' => ['qa', 'style-guide'],
+    'qa_style_guide_terminology_clarity' => ['qa', 'accessibility', 'style-guide'],
+    'qa_gate_tone_exclusions' => ['qa', 'tone', 'exclusions'],
+    'qa_gate_claims_exclusions' => ['qa', 'claims', 'exclusions'],
+    'qa_gate_accessibility_exclusions' => ['qa', 'accessibility', 'exclusions'],
+    'qa_gate_pii_exclusions' => ['qa', 'pii', 'exclusions'],
+  ];
+
+  // Assign tags to each ai_context entity.
+  $contextStorage = \Drupal::entityTypeManager()->getStorage('ai_context');
+  foreach ($contextTags as $contextId => $tags) {
+    $context = $contextStorage->load($contextId);
+    if ($context) {
+      $termIds = array_map(fn($name) => $tagMap[$name], $tags);
+      $context->set('tags', $termIds);
+      $context->save();
+    }
+  }
 }
 

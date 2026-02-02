@@ -33,7 +33,7 @@ class QaProfileListBuilder extends ConfigEntityListBuilder {
     $row = [
       'label' => $entity->label(),
       'target' => $entity->getTargetEntityTypeId() . ' / ' . ($entity->getTargetBundle() ?: $this->t('All bundles')),
-      'reports' => implode(', ', $entity->getEnabledReportPluginIds()) ?: $this->t('None'),
+      'reports' => implode(', ', $entity->getAgentsEnabled()) ?: $this->t('None'),
       'status' => $entity->isEnabled() ? $this->t('Enabled') : $this->t('Disabled'),
     ];
     return $row + parent::buildRow($entity);

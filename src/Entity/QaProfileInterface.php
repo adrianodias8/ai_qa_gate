@@ -52,28 +52,12 @@ interface QaProfileInterface extends ConfigEntityInterface {
   public function getIncludeMeta(): array;
 
   /**
-   * Gets the policy IDs.
+   * Gets the list of enabled agent IDs.
    *
    * @return array
-   *   Array of policy IDs.
+   *   Array of agent IDs.
    */
-  public function getPolicyIds(): array;
-
-  /**
-   * Gets the enabled reports configuration.
-   *
-   * @return array
-   *   Array of report configurations.
-   */
-  public function getReportsEnabled(): array;
-
-  /**
-   * Gets the AI settings.
-   *
-   * @return array
-   *   Array of AI settings.
-   */
-  public function getAiSettings(): array;
+  public function getAgentsEnabled(): array;
 
   /**
    * Gets the execution settings.
@@ -152,24 +136,4 @@ interface QaProfileInterface extends ConfigEntityInterface {
    */
   public function getBlockedTransitionIds(): array;
 
-  /**
-   * Gets the enabled report plugin IDs.
-   *
-   * @return array
-   *   Array of plugin IDs that are enabled.
-   */
-  public function getEnabledReportPluginIds(): array;
-
-  /**
-   * Gets configuration for a specific report plugin.
-   *
-   * @param string $plugin_id
-   *   The plugin ID.
-   *
-   * @return array
-   *   The plugin configuration.
-   */
-  public function getReportPluginConfiguration(string $plugin_id): array;
-
 }
-

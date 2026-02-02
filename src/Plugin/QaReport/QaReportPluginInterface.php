@@ -62,6 +62,27 @@ interface QaReportPluginInterface extends PluginInspectionInterface, ContainerFa
   public function setConfiguration(array $configuration): void;
 
   /**
+   * Builds the system message (static analysis instructions).
+   *
+   * @return string
+   *   The system prompt text.
+   */
+  public function buildSystemMessage(): string;
+
+  /**
+   * Builds the user message containing the content to analyze.
+   *
+   * @param array $context
+   *   The context from ContextBuilder.
+   * @param array $configuration
+   *   The plugin configuration.
+   *
+   * @return string
+   *   The user message text.
+   */
+  public function buildUserMessage(array $context, array $configuration): string;
+
+  /**
    * Builds the prompt for the AI model.
    *
    * @param array $context
@@ -78,6 +99,9 @@ interface QaReportPluginInterface extends PluginInspectionInterface, ContainerFa
    *   - system_message: The system prompt
    *   - user_message: The user message
    *   - output_schema_description: Description of expected output format
+   *
+   * @deprecated in ai_qa_gate:1.x and is removed from ai_qa_gate:2.x.
+   *   Use buildSystemMessage() and buildUserMessage() instead.
    */
   public function buildPrompt(array $context, array $configuration): array;
 

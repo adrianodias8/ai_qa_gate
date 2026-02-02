@@ -24,8 +24,7 @@ interface ContextBuilderInterface {
    *   The context array containing:
    *   - meta: Entity metadata
    *   - fragments: Field fragments
-   *   - combined_text: Combined text content
-   *   - policies: Injected policy content.
+   *   - combined_text: Combined text content.
    */
   public function buildContext(EntityInterface $entity, QaProfileInterface $profile): array;
 

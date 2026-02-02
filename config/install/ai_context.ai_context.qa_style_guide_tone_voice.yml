@@ -1,0 +1,29 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_style_guide_tone_voice
+label: 'Style Guide - Tone and Voice Review'
+description: 'Ensure content is conversational, reader-friendly, and written in active voice.'
+content: |
+  ## Tone and Voice Review
+
+  Ensure all content is conversational, reader-friendly, and written in active voice. Use plain language, contractions where appropriate, and speak directly to the reader ("you"). Avoid administrative or bureaucratic tone.
+
+  ### Good Examples
+  - "You can submit a complaint online, and we'll guide you through each step."
+  - "We're updating our guidelines to help you find information faster."
+  - "The tool is easy to use – just click 'Start' and follow the prompts."
+
+  ### Bad Examples
+  - "Complaints can be submitted to the Commission in writing."
+  - "It is often the case that users experience difficulties during registration."
+  - "The first thing to keep in mind is that the procedure must hereby be completed in full."
+
+  ### Disallowed Phrases
+  - "It is often the case that..."
+  - "The first thing to keep in mind is that..."
+  - "Please be aware that..."
+  - "Remember that..."
+  - Bureaucratic terms like "hereby," "thereof"
+  - Third-person references like "the user," "he/she"
+tags: []

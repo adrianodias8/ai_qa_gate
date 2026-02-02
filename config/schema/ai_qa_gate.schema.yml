@@ -60,48 +60,12 @@ ai_qa_gate.qa_profile.*:
         include_taxonomy_labels:
           type: boolean
           label: 'Include taxonomy labels'
-    policy_ids:
+    agents_enabled:
       type: sequence
-      label: 'Policy IDs'
+      label: 'Enabled agents'
       sequence:
         type: string
-        label: 'Policy ID'
-    reports_enabled:
-      type: sequence
-      label: 'Enabled reports'
-      sequence:
-        type: mapping
-        label: 'Report configuration'
-        mapping:
-          plugin_id:
-            type: string
-            label: 'Plugin ID'
-          enabled:
-            type: boolean
-            label: 'Enabled'
-          configuration:
-            type: ignore
-            label: 'Plugin configuration'
-    ai_settings:
-      type: mapping
-      label: 'AI settings'
-      mapping:
-        provider_id:
-          type: string
-          label: 'Provider ID'
-          nullable: true
-        model:
-          type: string
-          label: 'Model'
-          nullable: true
-        temperature:
-          type: float
-          label: 'Temperature'
-          nullable: true
-        max_tokens:
-          type: integer
-          label: 'Max tokens'
-          nullable: true
+        label: 'Agent ID'
     execution_settings:
       type: mapping
       label: 'Execution settings'
@@ -152,45 +116,6 @@ ai_qa_gate.qa_profile.*:
             type: string
             label: 'Role ID'
 
-ai_qa_gate.qa_policy.*:
-  type: config_entity
-  label: 'QA Policy'
-  mapping:
-    id:
-      type: string
-      label: 'Machine name'
-    label:
-      type: label
-      label: 'Label'
-    policy_text:
-      type: text
-      label: 'Policy text'
-    examples_good:
-      type: text
-      label: 'Good examples'
-    examples_bad:
-      type: text
-      label: 'Bad examples'
-    disallowed_phrases:
-      type: text
-      label: 'Disallowed phrases'
-    required_disclaimers:
-      type: text
-      label: 'Required disclaimers'
-    metadata:
-      type: mapping
-      label: 'Metadata'
-      mapping:
-        jurisdiction:
-          type: string
-          label: 'Jurisdiction'
-        audience:
-          type: string
-          label: 'Audience'
-        version:
-          type: string
-          label: 'Version'
-
 ai_qa_gate.settings:
   type: config_object
   label: 'AI QA Gate settings'
@@ -214,3 +139,13 @@ ai_qa_gate.settings:
       type: float
       label: 'Retry backoff multiplier'
 
+ai_agents.ai_agent.*.third_party.ai_qa_gate:
+  type: mapping
+  label: 'AI QA Gate settings'
+  mapping:
+    qa_report_plugin_id:
+      type: string
+      label: 'QA Report plugin ID'
+    qa_report_configuration:
+      type: ignore
+      label: 'Plugin configuration'

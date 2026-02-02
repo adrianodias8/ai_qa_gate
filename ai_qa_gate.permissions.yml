@@ -1,6 +1,6 @@
 administer ai qa gate:
   title: 'Administer AI QA Gate'
-  description: 'Manage QA profiles and policies configuration.'
+  description: 'Manage QA profiles configuration.'
   restrict access: true
 
 run ai qa analysis:

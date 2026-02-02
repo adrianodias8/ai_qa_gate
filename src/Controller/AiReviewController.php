@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\ai_qa_gate\Controller;
 
-use Drupal\ai_qa_gate\AiClient\AiClientInterface;
 use Drupal\ai_qa_gate\Entity\QaFinding;
 use Drupal\ai_qa_gate\Entity\QaFindingInterface;
 use Drupal\ai_qa_gate\Entity\QaRunInterface;
-use Drupal\ai_qa_gate\QaReportPluginManager;
 use Drupal\ai_qa_gate\Service\ContextBuilderInterface;
 use Drupal\ai_qa_gate\Service\ProfileMatcher;
 use Drupal\ai_qa_gate\Service\RunnerInterface;
@@ -16,6 +14,7 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
 use Drupal\node\NodeInterface;
@@ -35,18 +34,17 @@ class AiReviewController extends ControllerBase {
    *   The runner service.
    * @param \Drupal\ai_qa_gate\Service\ContextBuilderInterface $contextBuilder
    *   The context builder.
-   * @param \Drupal\ai_qa_gate\AiClient\AiClientInterface $aiClient
-   *   The AI client.
-   * @param \Drupal\ai_qa_gate\QaReportPluginManager $reportPluginManager
-   *   The report plugin manager.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
    */
   public function __construct(
     protected readonly ProfileMatcher $profileMatcher,
     protected readonly RunnerInterface $runner,
     protected readonly ContextBuilderInterface $contextBuilder,
-    protected readonly AiClientInterface $aiClient,
-    protected readonly QaReportPluginManager $reportPluginManager,
-  ) {}
+    EntityTypeManagerInterface $entityTypeManager,
+  ) {
+    $this->entityTypeManager = $entityTypeManager;
+  }
 
   /**
    * {@inheritdoc}
@@ -56,8 +54,7 @@ class AiReviewController extends ControllerBase {
       $container->get('ai_qa_gate.profile_matcher'),
       $container->get('ai_qa_gate.runner'),
       $container->get('ai_qa_gate.context_builder'),
-      $container->get('ai_qa_gate.ai_client'),
-      $container->get('plugin.manager.qa_report'),
+      $container->get('entity_type.manager'),
     );
   }
 
@@ -107,10 +104,6 @@ class AiReviewController extends ControllerBase {
       ];
     }
 
-    // Check AI availability.
-    $aiAvailable = $this->aiClient->isAvailable();
-    $aiMessage = $aiAvailable ? NULL : $this->aiClient->getUnavailableMessage();
-
     // Get latest run.
     $latestRun = $this->runner->getLatestRun($entity, $profile->id());
 
@@ -156,20 +149,14 @@ class AiReviewController extends ControllerBase {
       }
       unset($findings);
 
-      // Order plugins by weight (from plugin definition) then by label.
-      $pluginDefinitions = $this->reportPluginManager->getDefinitions();
-      uksort($findingsByPlugin, function ($pluginIdA, $pluginIdB) use ($pluginDefinitions) {
-        $defA = $pluginDefinitions[$pluginIdA] ?? [];
-        $defB = $pluginDefinitions[$pluginIdB] ?? [];
-        $weightA = $defA['weight'] ?? 0;
-        $weightB = $defB['weight'] ?? 0;
-        if ($weightA !== $weightB) {
-          return $weightA <=> $weightB;
-        }
-        // If same weight, sort by label.
-        $labelA = $defA['label'] ?? $pluginIdA;
-        $labelB = $defB['label'] ?? $pluginIdB;
-        return strcasecmp($labelA, $labelB);
+      // Order agents by label.
+      $agentStorage = $this->entityTypeManager->getStorage('ai_agent');
+      uksort($findingsByPlugin, function ($agentIdA, $agentIdB) use ($agentStorage) {
+        $agentA = $agentStorage->load($agentIdA);
+        $agentB = $agentStorage->load($agentIdB);
+        $labelA = $agentA ? $agentA->label() : $agentIdA;
+        $labelB = $agentB ? $agentB->label() : $agentIdB;
+        return strcasecmp((string) $labelA, (string) $labelB);
       });
 
       // Build summary from findings.
@@ -200,21 +187,10 @@ class AiReviewController extends ControllerBase {
       '#attributes' => ['class' => ['ai-qa-gate-review']],
     ];
 
-    // AI availability warning.
-    if (!$aiAvailable) {
-      $build['ai_warning'] = [
-        '#type' => 'container',
-        '#attributes' => ['class' => ['messages', 'messages--warning']],
-        'message' => [
-          '#markup' => $aiMessage,
-        ],
-      ];
-    }
-
     // Profile info.
-    $enabledPluginIds = $profile->getEnabledReportPluginIds();
-    $pluginDefinitions = $this->reportPluginManager->getDefinitions();
-    
+    $enabledAgentIds = $profile->getAgentsEnabled();
+    $agentStorage = $this->entityTypeManager->getStorage('ai_agent');
+
     $build['profile'] = [
       '#type' => 'details',
       '#title' => $this->t('QA Profile: @label', ['@label' => $profile->label()]),
@@ -230,51 +206,37 @@ class AiReviewController extends ControllerBase {
       ],
     ];
 
-    // Enabled reports with their settings.
-    if (!empty($enabledPluginIds)) {
-      $build['profile']['reports'] = [
+    // Enabled agents list.
+    if (!empty($enabledAgentIds)) {
+      $build['profile']['agents'] = [
         '#type' => 'container',
-        '#attributes' => ['class' => ['ai-qa-gate-enabled-reports']],
+        '#attributes' => ['class' => ['ai-qa-gate-enabled-agents']],
       ];
 
-      $build['profile']['reports']['title'] = [
+      $build['profile']['agents']['title'] = [
         '#type' => 'html_tag',
         '#tag' => 'strong',
-        '#value' => $this->t('Enabled reports:'),
+        '#value' => $this->t('Enabled agents:'),
       ];
 
-      $build['profile']['reports']['list'] = [
+      $build['profile']['agents']['list'] = [
         '#theme' => 'item_list',
         '#items' => [],
       ];
 
-      foreach ($enabledPluginIds as $pluginId) {
-        $pluginLabel = $pluginDefinitions[$pluginId]['label'] ?? $pluginId;
-        $pluginConfig = $profile->getReportPluginConfiguration($pluginId);
-        
-        // Format the settings for display.
-        $settingsText = $this->formatPluginSettings($pluginId, $pluginConfig, $pluginDefinitions);
-        
-        // Convert TranslatableMarkup to string.
-        $pluginLabelString = (string) $pluginLabel;
-        $settingsTextString = (string) $settingsText;
-        
-        // Build item content.
-        $itemContent = '<strong>' . htmlspecialchars($pluginLabelString) . '</strong>';
-        if (!empty($settingsTextString)) {
-          // Settings text is safe - it's built from translation calls with escaped placeholders.
-          $itemContent .= '<br><em>' . $this->t('Settings:') . '</em><br>' . $settingsTextString;
-        }
-        
-        $build['profile']['reports']['list']['#items'][] = [
-          '#markup' => $itemContent,
-          '#allowed_tags' => ['strong', 'em', 'br'],
+      foreach ($enabledAgentIds as $agentId) {
+        $agentEntity = $agentStorage->load($agentId);
+        $agentLabel = $agentEntity ? (string) $agentEntity->label() : $agentId;
+
+        $build['profile']['agents']['list']['#items'][] = [
+          '#markup' => '<strong>' . htmlspecialchars($agentLabel) . '</strong>',
+          '#allowed_tags' => ['strong'],
         ];
       }
     }
     else {
-      $build['profile']['info']['#items'][] = $this->t('Enabled reports: @reports', [
-        '@reports' => $this->t('None'),
+      $build['profile']['info']['#items'][] = $this->t('Enabled agents: @agents', [
+        '@agents' => $this->t('None'),
       ]);
     }
 
@@ -444,9 +406,9 @@ class AiReviewController extends ControllerBase {
         ],
       ];
 
-      $pluginDefinitions = $this->reportPluginManager->getDefinitions();
       foreach ($findingsByPlugin as $pluginId => $findings) {
-        $pluginLabel = $pluginDefinitions[$pluginId]['label'] ?? $pluginId;
+        $agentEntity = $agentStorage->load($pluginId);
+        $pluginLabel = $agentEntity ? $agentEntity->label() : $pluginId;
         $build['findings'][$pluginId] = [
           '#type' => 'details',
           '#title' => $this->t('@plugin (@count)', [
@@ -582,7 +544,7 @@ class AiReviewController extends ControllerBase {
     }
 
     // Run buttons.
-    $canRun = $this->currentUser()->hasPermission('run ai qa analysis') && $aiAvailable;
+    $canRun = $this->currentUser()->hasPermission('run ai qa analysis');
 
     if ($canRun) {
       $build['actions'] = [
@@ -603,55 +565,55 @@ class AiReviewController extends ControllerBase {
 
       $build['actions']['run_all'] = [
         '#type' => 'link',
-        '#title' => $latestRun ? $this->t('Run All Plugins Again') : $this->t('Run All Plugins'),
+        '#title' => $latestRun ? $this->t('Run All Agents Again') : $this->t('Run All Agents'),
         '#url' => $runAllUrl,
         '#attributes' => [
           'class' => ['button', 'button--primary'],
         ],
       ];
 
-      // Per-plugin status and buttons.
-      $enabledPlugins = $profile->getEnabledReportPluginIds();
-      $pluginDefinitions = $this->reportPluginManager->getDefinitions();
+      // Per-agent status and buttons.
+      $enabledAgents = $profile->getAgentsEnabled();
       $pluginResults = $latestRun ? $latestRun->getPluginResults() : [];
 
-      if (!empty($enabledPlugins)) {
-        $build['actions']['plugins'] = [
+      if (!empty($enabledAgents)) {
+        $build['actions']['agents'] = [
           '#type' => 'details',
-          '#title' => $this->t('Individual Plugin Controls'),
+          '#title' => $this->t('Individual Agent Controls'),
           '#open' => TRUE,
-          '#attributes' => ['class' => ['ai-qa-gate-plugin-controls']],
+          '#attributes' => ['class' => ['ai-qa-gate-agent-controls']],
         ];
 
-        $build['actions']['plugins']['table'] = [
+        $build['actions']['agents']['table'] = [
           '#type' => 'table',
           '#header' => [
-            $this->t('Plugin'),
+            $this->t('Agent'),
             $this->t('Status'),
             $this->t('Findings'),
             $this->t('Actions'),
           ],
-          '#empty' => $this->t('No plugins enabled.'),
+          '#empty' => $this->t('No agents enabled.'),
         ];
 
-        foreach ($enabledPlugins as $pluginId) {
-          $pluginLabel = $pluginDefinitions[$pluginId]['label'] ?? $pluginId;
-          $pluginStatus = $pluginResults[$pluginId]['status'] ?? 'not_run';
-          $pluginError = $pluginResults[$pluginId]['error'] ?? NULL;
+        foreach ($enabledAgents as $agentId) {
+          $agentEntity = $agentStorage->load($agentId);
+          $agentLabel = $agentEntity ? $agentEntity->label() : $agentId;
+          $agentStatus = $pluginResults[$agentId]['status'] ?? 'not_run';
+          $agentError = $pluginResults[$agentId]['error'] ?? NULL;
 
-          // Load findings from database for this plugin.
-          $pluginFindingEntities = $latestRun
-            ? QaFinding::loadForRun((int) $latestRun->id(), $pluginId)
+          // Load findings from database for this agent.
+          $agentFindingEntities = $latestRun
+            ? QaFinding::loadForRun((int) $latestRun->id(), $agentId)
             : [];
 
           // Status display.
-          $statusClass = match ($pluginStatus) {
+          $statusClass = match ($agentStatus) {
             QaRunInterface::STATUS_SUCCESS => 'color-success',
             QaRunInterface::STATUS_FAILED => 'color-error',
             QaRunInterface::STATUS_PENDING => 'color-warning',
             default => '',
           };
-          $statusLabel = match ($pluginStatus) {
+          $statusLabel = match ($agentStatus) {
             QaRunInterface::STATUS_SUCCESS => $this->t('Success'),
             QaRunInterface::STATUS_FAILED => $this->t('Failed'),
             QaRunInterface::STATUS_PENDING => $this->t('Pending'),
@@ -660,11 +622,11 @@ class AiReviewController extends ControllerBase {
 
           // Findings count by severity - load from database entities.
           $findingsDisplay = '-';
-          if ($pluginStatus === QaRunInterface::STATUS_SUCCESS && !empty($pluginFindingEntities)) {
+          if ($agentStatus === QaRunInterface::STATUS_SUCCESS && !empty($agentFindingEntities)) {
             $high = 0;
             $medium = 0;
             $low = 0;
-            foreach ($pluginFindingEntities as $findingEntity) {
+            foreach ($agentFindingEntities as $findingEntity) {
               $severity = $findingEntity->getSeverity();
               match ($severity) {
                 'high' => $high++,
@@ -685,31 +647,31 @@ class AiReviewController extends ControllerBase {
             }
             $findingsDisplay = $parts ? implode(', ', $parts) : $this->t('None');
           }
-          elseif ($pluginStatus === QaRunInterface::STATUS_SUCCESS) {
+          elseif ($agentStatus === QaRunInterface::STATUS_SUCCESS) {
             $findingsDisplay = $this->t('None');
           }
-          elseif ($pluginError) {
-            $findingsDisplay = '<span class="color-error" title="' . htmlspecialchars($pluginError) . '">' . $this->t('Error') . '</span>';
+          elseif ($agentError) {
+            $findingsDisplay = '<span class="color-error" title="' . htmlspecialchars($agentError) . '">' . $this->t('Error') . '</span>';
           }
 
-          // Run plugin URL.
+          // Run agent URL (uses plugin_id route param which now holds agent_id).
           if ($entity instanceof NodeInterface) {
-            $runPluginUrl = Url::fromRoute('ai_qa_gate.node_run_plugin', [
+            $runAgentUrl = Url::fromRoute('ai_qa_gate.node_run_plugin', [
               'node' => $entity->id(),
-              'plugin_id' => $pluginId,
+              'plugin_id' => $agentId,
             ]);
           }
           else {
-            $runPluginUrl = Url::fromRoute('ai_qa_gate.entity_run_plugin', [
+            $runAgentUrl = Url::fromRoute('ai_qa_gate.entity_run_plugin', [
               'entity_type_id' => $entity->getEntityTypeId(),
               'entity' => $entity->id(),
-              'plugin_id' => $pluginId,
+              'plugin_id' => $agentId,
             ]);
           }
 
-          $build['actions']['plugins']['table'][$pluginId] = [
-            'plugin' => [
-              '#markup' => '<strong>' . $pluginLabel . '</strong>',
+          $build['actions']['agents']['table'][$agentId] = [
+            'agent' => [
+              '#markup' => '<strong>' . $agentLabel . '</strong>',
             ],
             'status' => [
               '#markup' => '<span class="' . $statusClass . '">' . $statusLabel . '</span>',
@@ -719,8 +681,8 @@ class AiReviewController extends ControllerBase {
             ],
             'actions' => [
               '#type' => 'link',
-              '#title' => $pluginStatus === 'not_run' ? $this->t('Run') : $this->t('Re-run'),
-              '#url' => $runPluginUrl,
+              '#title' => $agentStatus === 'not_run' ? $this->t('Run') : $this->t('Re-run'),
+              '#url' => $runAgentUrl,
               '#attributes' => [
                 'class' => ['button', 'button--small'],
               ],
@@ -836,77 +798,6 @@ class AiReviewController extends ControllerBase {
     $result->addCacheContexts(['user']);
     
     return $result;
-  }
-
-  /**
-   * Formats plugin settings for display.
-   *
-   * @param string $plugin_id
-   *   The plugin ID.
-   * @param array $configuration
-   *   The plugin configuration.
-   * @param array $plugin_definitions
-   *   All plugin definitions.
-   *
-   * @return string
-   *   Formatted settings string.
-   */
-  protected function formatPluginSettings(string $plugin_id, array $configuration, array $plugin_definitions): string {
-    if (empty($configuration)) {
-      return '';
-    }
-
-    // Filter out default/common settings that aren't meaningful to display.
-    $defaultSettings = ['enabled', 'severity_weight'];
-    $settings = [];
-    
-    foreach ($configuration as $key => $value) {
-      // Skip default settings.
-      if (in_array($key, $defaultSettings, TRUE)) {
-        continue;
-      }
-
-      // Format boolean values (including 1/0 from checkboxes, as int or string).
-      if (is_bool($value) || $value === 1 || $value === 0 || $value === '1' || $value === '0') {
-        $boolValue = is_bool($value) ? $value : (bool) (int) $value;
-        $settings[] = $this->t('@key: @value', [
-          '@key' => $this->formatSettingKey($key),
-          '@value' => $boolValue ? $this->t('Yes') : $this->t('No'),
-        ]);
-      }
-      // Format numeric values (excluding 1/0 which are handled as booleans).
-      elseif (is_numeric($value) && (int) $value !== 1 && (int) $value !== 0) {
-        $settings[] = $this->t('@key: @value', [
-          '@key' => $this->formatSettingKey($key),
-          '@value' => $value,
-        ]);
-      }
-      // Format string values.
-      elseif (is_string($value) && !empty($value)) {
-        $settings[] = $this->t('@key: @value', [
-          '@key' => $this->formatSettingKey($key),
-          '@value' => $value,
-        ]);
-      }
-    }
-
-    return !empty($settings) ? (string) implode('<br>', $settings) : '';
-  }
-
-  /**
-   * Formats a setting key for display.
-   *
-   * @param string $key
-   *   The setting key.
-   *
-   * @return string
-   *   Formatted key.
-   */
-  protected function formatSettingKey(string $key): string {
-    // Convert snake_case to Title Case.
-    $formatted = str_replace('_', ' ', $key);
-    $formatted = ucwords($formatted);
-    return $formatted;
   }
 
 }

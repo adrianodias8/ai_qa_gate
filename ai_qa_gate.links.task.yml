@@ -4,12 +4,6 @@ ai_qa_gate.admin_profiles:
   route_name: ai_qa_gate.admin_profiles
   base_route: ai_qa_gate.admin_profiles
 
-ai_qa_gate.admin_policies:
-  title: 'Policies'
-  route_name: ai_qa_gate.admin_policies
-  base_route: ai_qa_gate.admin_profiles
-  weight: 5
-
 ai_qa_gate.admin_settings:
   title: 'Settings'
   route_name: ai_qa_gate.admin_settings

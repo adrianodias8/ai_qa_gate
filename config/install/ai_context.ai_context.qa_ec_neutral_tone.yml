@@ -1,0 +1,55 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_ec_neutral_tone
+label: 'EC Neutral Tone'
+description: 'Institutional tone guidelines for political neutrality and balanced communication.'
+content: |
+  ## Institutional Tone Guidelines
+
+  ### Voice Requirements
+  - Formal but accessible
+  - Objective and balanced
+  - Informative rather than persuasive
+  - Respectful of diverse viewpoints
+
+  ### Political Neutrality
+  - Present facts without political commentary
+  - Avoid language that favors particular political positions
+  - Do not characterize opposition or critique
+  - Remain neutral on matters of ongoing political debate
+
+  ### Avoid
+  - Emotional language or appeals
+  - Hyperbole or exaggeration
+  - Marketing or promotional tone
+  - Disparaging language about any party
+  - Triumphalist or self-congratulatory language
+
+  ### Balance
+  - Acknowledge complexity where it exists
+  - Present multiple perspectives where relevant
+  - Avoid oversimplification of contested issues
+
+  ### Good Examples
+  - "The proposal received support from some stakeholders while others raised concerns about implementation costs."
+  - "The regulation introduces new requirements that apply to designated platforms."
+  - "Various approaches exist to address this challenge, including regulatory and self-regulatory measures."
+
+  ### Bad Examples
+  - "This landmark achievement demonstrates the EU's commitment to protecting citizens." (self-congratulatory)
+  - "Critics of the regulation fail to understand its importance." (dismissive)
+  - "The revolutionary new rules will transform the industry." (promotional)
+
+  ### Disallowed Phrases
+  - landmark achievement
+  - historic decision
+  - critics fail to
+  - opponents ignore
+  - clear victory
+  - major success
+  - the EU leads
+  - world-class
+  - best in class
+  - ambitious agenda
+tags: []

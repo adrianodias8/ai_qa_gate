@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Drupal\ai_qa_gate\Service;
 
-use Drupal\ai_qa_gate\AiClient\AiClientInterface;
+use Drupal\ai\AiProviderPluginManager;
+use Drupal\ai_agents\PluginManager\AiAgentManager;
+use Drupal\ai_agents\Task\Task;
 use Drupal\ai_qa_gate\Entity\QaFinding;
 use Drupal\ai_qa_gate\Entity\QaProfile;
 use Drupal\ai_qa_gate\Entity\QaProfileInterface;
 use Drupal\ai_qa_gate\Entity\QaRun;
 use Drupal\ai_qa_gate\Entity\QaRunInterface;
-use Drupal\ai_qa_gate\Exception\AiClientException;
 use Drupal\ai_qa_gate\QaReportPluginManager;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
@@ -33,8 +34,8 @@ class Runner implements RunnerInterface {
    *   The entity type manager.
    * @param \Drupal\ai_qa_gate\Service\ContextBuilderInterface $contextBuilder
    *   The context builder.
-   * @param \Drupal\ai_qa_gate\AiClient\AiClientInterface $aiClient
-   *   The AI client.
+   * @param \Drupal\ai_agents\PluginManager\AiAgentManager $agentManager
+   *   The AI agent plugin manager.
    * @param \Drupal\ai_qa_gate\QaReportPluginManager $reportPluginManager
    *   The report plugin manager.
    * @param \Drupal\Core\Queue\QueueFactory $queueFactory
@@ -47,17 +48,20 @@ class Runner implements RunnerInterface {
    *   The logger factory.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory.
+   * @param \Drupal\ai\AiProviderPluginManager $aiProviderManager
+   *   The AI provider plugin manager.
    */
   public function __construct(
     protected readonly EntityTypeManagerInterface $entityTypeManager,
     protected readonly ContextBuilderInterface $contextBuilder,
-    protected readonly AiClientInterface $aiClient,
+    protected readonly AiAgentManager $agentManager,
     protected readonly QaReportPluginManager $reportPluginManager,
     protected readonly QueueFactory $queueFactory,
     protected readonly AccountProxyInterface $currentUser,
     protected readonly TimeInterface $time,
     protected readonly LoggerChannelFactoryInterface $loggerFactory,
     protected readonly ConfigFactoryInterface $configFactory,
+    protected readonly AiProviderPluginManager $aiProviderManager,
   ) {}
 
   /**
@@ -94,12 +98,12 @@ class Runner implements RunnerInterface {
     $defaultRunMode = $settings->get('default_run_mode') ?? 'queue';
 
     if ($runMode === 'queue' && $defaultRunMode !== 'sync') {
-      return $this->queueAllPlugins($entity, $profile_id);
+      return $this->queueAllAgents($entity, $profile_id);
     }
 
     // Sync execution with backoff.
     $qaRun = $this->createPendingRun($entity, $profile);
-    $qaRun->save();  // Save to get an ID before executing plugins.
+    $qaRun->save();
     return $this->executeRunWithBackoff($qaRun);
   }
 
@@ -107,30 +111,27 @@ class Runner implements RunnerInterface {
    * {@inheritdoc}
    */
   public function queue(EntityInterface $entity, string $profile_id): QaRunInterface {
-    // Delegate to queueAllPlugins for per-plugin queueing.
-    return $this->queueAllPlugins($entity, $profile_id);
+    return $this->queueAllAgents($entity, $profile_id);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function queueAllPlugins(EntityInterface $entity, string $profile_id): QaRunInterface {
+  public function queueAllAgents(EntityInterface $entity, string $profile_id): QaRunInterface {
     $profile = $this->loadProfile($profile_id);
     if (!$profile) {
       throw new \InvalidArgumentException("Profile '{$profile_id}' not found.");
     }
 
     $qaRun = $this->createPendingRun($entity, $profile);
-    
-    // Initialize plugin results with pending status for all enabled plugins.
-    $enabledReports = $profile->getReportsEnabled();
+
+    // Initialize plugin results with pending status for all enabled agents.
+    $agentIds = $profile->getAgentsEnabled();
     $pluginResults = [];
-    foreach ($enabledReports as $reportConfig) {
-      if (!empty($reportConfig['enabled'])) {
-        $pluginResults[$reportConfig['plugin_id']] = [
-          'status' => QaRunInterface::STATUS_PENDING,
-        ];
-      }
+    foreach ($agentIds as $agentId) {
+      $pluginResults[$agentId] = [
+        'status' => QaRunInterface::STATUS_PENDING,
+      ];
     }
     $qaRun->setPluginResults($pluginResults);
     $qaRun->save();
@@ -139,21 +140,17 @@ class Runner implements RunnerInterface {
     $settings = $this->configFactory->get('ai_qa_gate.settings');
     $backoffSeconds = $settings->get('plugin_backoff_seconds') ?? 5;
 
-    // Queue each plugin separately with delay.
+    // Queue each agent separately with delay.
     $queue = $this->queueFactory->get('ai_qa_gate_plugin_worker');
     $index = 0;
     $baseTime = $this->time->getRequestTime();
 
-    foreach ($enabledReports as $reportConfig) {
-      if (empty($reportConfig['enabled'])) {
-        continue;
-      }
-
+    foreach ($agentIds as $agentId) {
       $delayUntil = $baseTime + ($index * $backoffSeconds);
-      
+
       $queue->createItem([
         'qa_run_id' => $qaRun->id(),
-        'plugin_id' => $reportConfig['plugin_id'],
+        'agent_id' => $agentId,
         'entity_type_id' => $entity->getEntityTypeId(),
         'entity_id' => $entity->id(),
         'revision_id' => $entity instanceof RevisionableInterface ? $entity->getRevisionId() : NULL,
@@ -162,7 +159,7 @@ class Runner implements RunnerInterface {
         'delay_until' => $delayUntil,
         'retry_count' => 0,
       ]);
-      
+
       $index++;
     }
 
@@ -172,7 +169,7 @@ class Runner implements RunnerInterface {
   /**
    * {@inheritdoc}
    */
-  public function queuePlugin(EntityInterface $entity, string $profile_id, string $plugin_id): QaRunInterface {
+  public function queueAgent(EntityInterface $entity, string $profile_id, string $agent_id): QaRunInterface {
     $profile = $this->loadProfile($profile_id);
     if (!$profile) {
       throw new \InvalidArgumentException("Profile '{$profile_id}' not found.");
@@ -181,17 +178,13 @@ class Runner implements RunnerInterface {
     // Get or create QA run.
     $qaRun = $this->getLatestRun($entity, $profile_id);
     if (!$qaRun) {
-      // No existing run - create new one.
       $qaRun = $this->createPendingRun($entity, $profile);
-      $pluginResults = [$plugin_id => ['status' => QaRunInterface::STATUS_PENDING]];
+      $pluginResults = [$agent_id => ['status' => QaRunInterface::STATUS_PENDING]];
       $qaRun->setPluginResults($pluginResults);
       $qaRun->save();
     }
     else {
-      // Reuse existing run - preserve results from other plugins.
-      // Just mark this plugin as pending before re-running.
-      $qaRun->setPluginStatus($plugin_id, QaRunInterface::STATUS_PENDING);
-      // Reset overall status to pending since we're re-running a plugin.
+      $qaRun->setPluginStatus($agent_id, QaRunInterface::STATUS_PENDING);
       if ($qaRun->getStatus() === QaRunInterface::STATUS_SUCCESS) {
         $qaRun->setStatus(QaRunInterface::STATUS_PENDING);
       }
@@ -201,7 +194,7 @@ class Runner implements RunnerInterface {
     $queue = $this->queueFactory->get('ai_qa_gate_plugin_worker');
     $queue->createItem([
       'qa_run_id' => $qaRun->id(),
-      'plugin_id' => $plugin_id,
+      'agent_id' => $agent_id,
       'entity_type_id' => $entity->getEntityTypeId(),
       'entity_id' => $entity->id(),
       'revision_id' => $entity instanceof RevisionableInterface ? $entity->getRevisionId() : NULL,
@@ -217,7 +210,7 @@ class Runner implements RunnerInterface {
   /**
    * {@inheritdoc}
    */
-  public function runPlugin(EntityInterface $entity, string $profile_id, string $plugin_id, bool $force = FALSE): QaRunInterface {
+  public function runAgent(EntityInterface $entity, string $profile_id, string $agent_id, bool $force = FALSE): QaRunInterface {
     $profile = $this->loadProfile($profile_id);
     if (!$profile) {
       throw new \InvalidArgumentException("Profile '{$profile_id}' not found.");
@@ -229,52 +222,48 @@ class Runner implements RunnerInterface {
     $defaultRunMode = $settings->get('default_run_mode') ?? 'queue';
 
     if ($runMode === 'queue' && $defaultRunMode !== 'sync') {
-      return $this->queuePlugin($entity, $profile_id, $plugin_id);
+      return $this->queueAgent($entity, $profile_id, $agent_id);
     }
 
-    // Sync execution for single plugin.
+    // Sync execution for single agent.
     $qaRun = $this->getLatestRun($entity, $profile_id);
     if (!$qaRun || $force) {
-      // No existing run or force flag - create new run.
       $qaRun = $this->createPendingRun($entity, $profile);
-      $qaRun->setPluginResults([$plugin_id => ['status' => QaRunInterface::STATUS_PENDING]]);
+      $qaRun->setPluginResults([$agent_id => ['status' => QaRunInterface::STATUS_PENDING]]);
       $qaRun->save();
     }
     else {
-      // Reuse existing run - preserve results from other plugins.
-      // Just mark this plugin as pending before re-running.
-      $qaRun->setPluginStatus($plugin_id, QaRunInterface::STATUS_PENDING);
-      // Reset overall status to pending since we're re-running a plugin.
+      $qaRun->setPluginStatus($agent_id, QaRunInterface::STATUS_PENDING);
       if ($qaRun->getStatus() === QaRunInterface::STATUS_SUCCESS) {
         $qaRun->setStatus(QaRunInterface::STATUS_PENDING);
       }
       $qaRun->save();
     }
 
-    $result = $this->executePlugin($qaRun, $plugin_id);
-    
-    $qaRun->setPluginStatus($plugin_id, $result['status'], $result['findings'] ?? NULL, $result['error'] ?? NULL);
-    
+    $result = $this->executeAgent($qaRun, $agent_id);
+
+    $qaRun->setPluginStatus($agent_id, $result['status'], $result['findings'] ?? NULL, $result['error'] ?? NULL);
+
     // Persist findings to dedicated database table for reliable storage.
     if ($result['status'] === QaRunInterface::STATUS_SUCCESS && !empty($result['findings'])) {
-      $this->persistFindings($qaRun, $plugin_id, $result['findings']);
+      $this->persistFindings($qaRun, $agent_id, $result['findings']);
     }
-    
+
     if (!empty($result['provider_id'])) {
       $qaRun->set('provider_id', $result['provider_id']);
     }
     if (!empty($result['model'])) {
       $qaRun->set('model', $result['model']);
     }
-    
-    // Aggregate and finalize if all plugins complete.
-    $expectedPlugins = $profile->getEnabledReportPluginIds();
-    if ($qaRun->areAllPluginsComplete($expectedPlugins)) {
+
+    // Aggregate and finalize if all agents complete.
+    $expectedAgents = $profile->getAgentsEnabled();
+    if ($qaRun->areAllPluginsComplete($expectedAgents)) {
       $qaRun->aggregatePluginFindings();
       $qaRun->computeSummaryCounts();
       $qaRun->setStatus(QaRunInterface::STATUS_SUCCESS);
     }
-    
+
     $qaRun->save();
     return $qaRun;
   }
@@ -298,7 +287,7 @@ class Runner implements RunnerInterface {
   }
 
   /**
-   * Executes a QA run with backoff between plugins.
+   * Executes a QA run with backoff between agents.
    *
    * @param \Drupal\ai_qa_gate\Entity\QaRunInterface $qa_run
    *   The QA run.
@@ -326,46 +315,35 @@ class Runner implements RunnerInterface {
         throw new \RuntimeException('Profile not found.');
       }
 
-      // Check AI client availability.
-      if (!$this->aiClient->isAvailable()) {
-        throw new AiClientException($this->aiClient->getUnavailableMessage());
-      }
-
       // Get backoff settings.
       $settings = $this->configFactory->get('ai_qa_gate.settings');
       $backoffSeconds = $settings->get('plugin_backoff_seconds') ?? 5;
 
-      // Run each enabled report plugin with backoff.
-      $enabledReports = $profile->getReportsEnabled();
+      // Run each enabled agent with backoff.
+      $agentIds = $profile->getAgentsEnabled();
       $providerUsed = NULL;
       $modelUsed = NULL;
       $index = 0;
 
-      foreach ($enabledReports as $reportConfig) {
-        if (empty($reportConfig['enabled'])) {
-          continue;
-        }
-
-        $pluginId = $reportConfig['plugin_id'];
-        
-        // Apply backoff delay (skip for first plugin).
+      foreach ($agentIds as $agentId) {
+        // Apply backoff delay (skip for first agent).
         if ($index > 0 && $backoffSeconds > 0) {
-          $logger->info('Waiting @seconds seconds before running plugin @plugin', [
+          $logger->info('Waiting @seconds seconds before running agent @agent', [
             '@seconds' => $backoffSeconds,
-            '@plugin' => $pluginId,
+            '@agent' => $agentId,
           ]);
           sleep($backoffSeconds);
         }
 
-        $result = $this->executePlugin($qa_run, $pluginId);
-        
-        $qa_run->setPluginStatus($pluginId, $result['status'], $result['findings'] ?? NULL, $result['error'] ?? NULL);
-        
+        $result = $this->executeAgent($qa_run, $agentId);
+
+        $qa_run->setPluginStatus($agentId, $result['status'], $result['findings'] ?? NULL, $result['error'] ?? NULL);
+
         // Persist findings to dedicated database table for reliable storage.
         if ($result['status'] === QaRunInterface::STATUS_SUCCESS && !empty($result['findings'])) {
-          $this->persistFindings($qa_run, $pluginId, $result['findings']);
+          $this->persistFindings($qa_run, $agentId, $result['findings']);
         }
-        
+
         if (!empty($result['provider_id'])) {
           $providerUsed = $result['provider_id'];
         }
@@ -376,7 +354,7 @@ class Runner implements RunnerInterface {
         $index++;
       }
 
-      // Aggregate findings from all plugins.
+      // Aggregate findings from all agents.
       $qa_run->aggregatePluginFindings();
 
       // Update QA run.
@@ -409,9 +387,8 @@ class Runner implements RunnerInterface {
   /**
    * {@inheritdoc}
    */
-  public function executePlugin(QaRunInterface $qa_run, string $plugin_id, int $retry_count = 0): array {
+  public function executeAgent(QaRunInterface $qa_run, string $agent_id, int $retry_count = 0): array {
     $logger = $this->loggerFactory->get('ai_qa_gate');
-    $settings = $this->configFactory->get('ai_qa_gate.settings');
 
     try {
       // Load the entity.
@@ -430,24 +407,24 @@ class Runner implements RunnerInterface {
         throw new \RuntimeException('Profile not found.');
       }
 
-      // Check AI client availability.
-      if (!$this->aiClient->isAvailable()) {
-        throw new AiClientException($this->aiClient->getUnavailableMessage());
+      // Load the agent config entity to read plugin from third_party_settings.
+      $agentEntity = $this->entityTypeManager->getStorage('ai_agent')->load($agent_id);
+      if (!$agentEntity) {
+        throw new \RuntimeException("Agent '{$agent_id}' not found.");
       }
+
+      $pluginId = $agentEntity->getThirdPartySetting('ai_qa_gate', 'qa_report_plugin_id', '');
+      if (empty($pluginId)) {
+        throw new \RuntimeException("Agent '{$agent_id}' has no QA Report plugin configured.");
+      }
+
+      $pluginConfig = $agentEntity->getThirdPartySetting('ai_qa_gate', 'qa_report_configuration', []);
 
       // Build context.
       $context = $this->contextBuilder->buildContext($entity, $profile);
 
-      // Get plugin configuration from profile.
-      $pluginConfig = [];
-      foreach ($profile->getReportsEnabled() as $reportConfig) {
-        if ($reportConfig['plugin_id'] === $plugin_id) {
-          $pluginConfig = $reportConfig['configuration'] ?? [];
-          break;
-        }
-      }
-
-      $plugin = $this->reportPluginManager->createInstance($plugin_id, $pluginConfig);
+      // Create plugin instance.
+      $plugin = $this->reportPluginManager->createInstance($pluginId, $pluginConfig);
 
       // Check if plugin supports this entity type.
       if (!$plugin->supportsEntityType($entity->getEntityTypeId())) {
@@ -461,29 +438,41 @@ class Runner implements RunnerInterface {
         ];
       }
 
-      // Build prompt.
-      $prompt = $plugin->buildPrompt($context, $pluginConfig);
+      // Build user message from plugin.
+      $userMessage = $plugin->buildUserMessage($context, $pluginConfig);
 
-      // Get AI settings.
-      $aiSettings = $profile->getAiSettings();
+      // Create agent instance — DO NOT override system_prompt.
+      /** @var \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper $agent */
+      $agent = $this->agentManager->createInstance($agent_id);
 
-      // Call AI.
-      $response = $this->aiClient->chat(
-        $prompt['system_message'] ?? '',
-        $prompt['user_message'] ?? '',
-        [
-          'provider_id' => $aiSettings['provider_id'] ?? NULL,
-          'model' => $aiSettings['model'] ?? NULL,
-          'temperature' => $aiSettings['temperature'] ?? NULL,
-          'max_tokens' => $aiSettings['max_tokens'] ?? NULL,
-        ],
-      );
+      // Resolve and set the AI provider.
+      $defaults = $this->aiProviderManager->getDefaultProviderForOperationType('chat_with_tools');
+      if (empty($defaults['provider_id'])) {
+        $defaults = $this->aiProviderManager->getDefaultProviderForOperationType('chat');
+      }
+      if (empty($defaults['provider_id'])) {
+        throw new \RuntimeException('No default AI provider configured. Please configure a default chat provider at /admin/config/ai/settings.');
+      }
+      $provider = $this->aiProviderManager->createInstance($defaults['provider_id']);
+      $agent->setAiProvider($provider);
+      $agent->setModelName($defaults['model_id']);
+
+      // Set the task (user message) and execute.
+      $task = new Task($userMessage);
+      $agent->setTask($task);
+
+      // determineSolvability() fires BuildSystemPromptEvent which triggers
+      // ai_context's SystemPromptSubscriber to inject per-agent policies.
+      $agent->determineSolvability();
+
+      // Get the AI response.
+      $response = $agent->answerQuestion();
 
       // Parse response.
-      $findings = $plugin->parseResponse($response->getContent(), $pluginConfig);
+      $findings = $plugin->parseResponse($response, $pluginConfig);
 
-      $logger->info('Plugin @plugin completed successfully for QA run @id', [
-        '@plugin' => $plugin_id,
+      $logger->info('Agent @agent completed successfully for QA run @id', [
+        '@agent' => $agent_id,
         '@id' => $qa_run->id(),
       ]);
 
@@ -491,36 +480,15 @@ class Runner implements RunnerInterface {
         'status' => QaRunInterface::STATUS_SUCCESS,
         'findings' => $findings,
         'error' => NULL,
-        'provider_id' => $response->getProviderId(),
-        'model' => $response->getModel(),
+        'provider_id' => $defaults['provider_id'] ?? NULL,
+        'model' => $defaults['model_id'] ?? NULL,
       ];
     }
     catch (\Exception $e) {
       $errorMessage = $e->getMessage();
-      $isRateLimitError = $this->isRateLimitError($errorMessage);
-      
-      // Check if we should retry.
-      $retryOnRateLimit = $settings->get('retry_on_rate_limit') ?? TRUE;
-      $maxRetries = $settings->get('max_retries') ?? 3;
 
-      if ($isRateLimitError && $retryOnRateLimit && $retry_count < $maxRetries) {
-        $backoffMultiplier = $settings->get('retry_backoff_multiplier') ?? 2.0;
-        $baseBackoff = $settings->get('plugin_backoff_seconds') ?? 5;
-        $retryDelay = (int) ($baseBackoff * pow($backoffMultiplier, $retry_count));
-        
-        $logger->warning('Rate limit hit for plugin @plugin (attempt @attempt/@max). Retrying in @delay seconds.', [
-          '@plugin' => $plugin_id,
-          '@attempt' => $retry_count + 1,
-          '@max' => $maxRetries,
-          '@delay' => $retryDelay,
-        ]);
-
-        sleep($retryDelay);
-        return $this->executePlugin($qa_run, $plugin_id, $retry_count + 1);
-      }
-
-      $logger->error('Plugin @plugin failed for QA run @id: @message', [
-        '@plugin' => $plugin_id,
+      $logger->error('Agent @agent failed for QA run @id: @message', [
+        '@agent' => $agent_id,
         '@id' => $qa_run->id(),
         '@message' => $errorMessage,
       ]);
@@ -530,7 +498,7 @@ class Runner implements RunnerInterface {
         'findings' => [[
           'category' => 'system',
           'severity' => 'low',
-          'title' => "Report plugin '{$plugin_id}' failed",
+          'title' => "Agent '{$agent_id}' failed",
           'explanation' => $errorMessage,
           'evidence' => [
             'field' => '_system',
@@ -546,36 +514,6 @@ class Runner implements RunnerInterface {
         'model' => NULL,
       ];
     }
-  }
-
-  /**
-   * Checks if an error message indicates a rate limit error.
-   *
-   * @param string $message
-   *   The error message.
-   *
-   * @return bool
-   *   TRUE if it's a rate limit error.
-   */
-  protected function isRateLimitError(string $message): bool {
-    $rateLimitPatterns = [
-      'rate limit',
-      'rate_limit',
-      'too many requests',
-      '429',
-      'quota exceeded',
-      'throttle',
-      'exceeded.*limit',
-    ];
-
-    $messageLower = strtolower($message);
-    foreach ($rateLimitPatterns as $pattern) {
-      if (str_contains($messageLower, $pattern) || preg_match('/' . $pattern . '/i', $message)) {
-        return TRUE;
-      }
-    }
-
-    return FALSE;
   }
 
   /**
@@ -671,103 +609,31 @@ class Runner implements RunnerInterface {
   }
 
   /**
-   * Builds the results structure.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity.
-   * @param \Drupal\ai_qa_gate\Entity\QaProfileInterface $profile
-   *   The profile.
-   * @param array $findings
-   *   The findings.
-   *
-   * @return array
-   *   The results structure.
-   */
-  protected function buildResults(EntityInterface $entity, QaProfileInterface $profile, array $findings): array {
-    // Count by severity.
-    $counts = ['high' => 0, 'medium' => 0, 'low' => 0];
-    $maxSeverity = 'none';
-    $severityOrder = ['none' => 0, 'low' => 1, 'medium' => 2, 'high' => 3];
-
-    foreach ($findings as $finding) {
-      $severity = $finding['severity'] ?? 'low';
-      if (isset($counts[$severity])) {
-        $counts[$severity]++;
-      }
-      if (($severityOrder[$severity] ?? 0) > ($severityOrder[$maxSeverity] ?? 0)) {
-        $maxSeverity = $severity;
-      }
-    }
-
-    // Build summary.
-    $totalFindings = array_sum($counts);
-    if ($totalFindings === 0) {
-      $summary = 'No issues found.';
-    }
-    else {
-      $parts = [];
-      if ($counts['high'] > 0) {
-        $parts[] = $counts['high'] . ' high';
-      }
-      if ($counts['medium'] > 0) {
-        $parts[] = $counts['medium'] . ' medium';
-      }
-      if ($counts['low'] > 0) {
-        $parts[] = $counts['low'] . ' low';
-      }
-      $summary = 'Found ' . implode(', ', $parts) . ' severity issue(s).';
-    }
-
-    return [
-      'schema_version' => '1.0',
-      'entity' => [
-        'type' => $entity->getEntityTypeId(),
-        'id' => (string) $entity->id(),
-        'revision' => $entity instanceof RevisionableInterface ? (string) $entity->getRevisionId() : NULL,
-        'bundle' => $entity->bundle(),
-        'langcode' => method_exists($entity, 'language') ? $entity->language()->getId() : 'en',
-      ],
-      'profile_id' => $profile->id(),
-      'generated_at' => date('c'),
-      'overall' => [
-        'max_severity' => $maxSeverity,
-        'counts' => $counts,
-        'summary' => $summary,
-      ],
-      'findings' => $findings,
-    ];
-  }
-
-  /**
    * Persists plugin findings to the database as QaFinding entities.
-   *
-   * This ensures findings are stored in a dedicated table for reliable
-   * persistence, independent of JSON field caching issues.
    *
    * @param \Drupal\ai_qa_gate\Entity\QaRunInterface $qa_run
    *   The QA run.
-   * @param string $plugin_id
-   *   The plugin ID.
+   * @param string $agent_id
+   *   The agent ID.
    * @param array $findings
    *   Array of finding data from the AI response.
    */
-  protected function persistFindings(QaRunInterface $qa_run, string $plugin_id, array $findings): void {
+  protected function persistFindings(QaRunInterface $qa_run, string $agent_id, array $findings): void {
     $logger = $this->loggerFactory->get('ai_qa_gate');
     $qaRunId = (int) $qa_run->id();
 
-    // Delete any existing findings for this plugin+run combination.
-    QaFinding::deleteForPlugin($qaRunId, $plugin_id);
+    // Delete any existing findings for this agent+run combination.
+    QaFinding::deleteForPlugin($qaRunId, $agent_id);
 
     // Create new findings.
     if (!empty($findings)) {
-      QaFinding::createFromArray($qaRunId, $plugin_id, $findings);
-      $logger->info('Persisted @count findings for plugin @plugin on QA run @id.', [
+      QaFinding::createFromArray($qaRunId, $agent_id, $findings);
+      $logger->info('Persisted @count findings for agent @agent on QA run @id.', [
         '@count' => count($findings),
-        '@plugin' => $plugin_id,
+        '@agent' => $agent_id,
         '@id' => $qaRunId,
       ]);
     }
   }
 
 }
-

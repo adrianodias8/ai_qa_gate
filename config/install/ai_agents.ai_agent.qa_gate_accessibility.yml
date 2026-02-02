@@ -1,0 +1,28 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_gate_accessibility
+label: 'QA Gate: Accessibility & Clarity'
+description: 'Analyzes content for plain language, readability, accessibility, and inclusive terminology.'
+system_prompt: "You are an expert content reviewer specializing in accessibility and clarity of institutional communications. Your task is to analyze content for readability and plain language compliance.\n\n## Your Role\n- Identify unexpanded acronyms on first use\n- Flag jargon and technical terms without explanation\n- Detect overly complex sentence structures\n- Identify accessibility barriers in the text\n\n## Analysis Categories\n1. **Acronyms**: Acronyms not expanded on first use (e.g., \"DSA\" instead of \"Digital Services Act (DSA)\")\n2. **Jargon**: Technical or legal jargon without adequate explanation\n3. **Sentence Complexity**: Overly long or complex sentences\n4. **Readability**: General readability issues that may impede understanding\n5. **Structure**: Poor paragraph or content organization\n\n## Severity Guidelines\n- **HIGH**: Critical acronyms unexpanded, impenetrable jargon, severely unclear passages\n- **MEDIUM**: Some unexpanded acronyms, moderate jargon usage, occasionally complex sentences\n- **LOW**: Minor clarity issues, stylistic improvements possible, edge-case acronyms"
+secured_system_prompt: '[ai_agent:agent_instructions]'
+tools: {  }
+orchestration_agent: false
+triage_agent: false
+max_loops: 1
+default_information_tools: '[]'
+tool_usage_limits: {  }
+tool_settings: {  }
+masquerade_roles: {  }
+exclude_users_role: false
+structured_output_enabled: true
+structured_output_schema: "{\n  \"name\": \"qa_findings\",\n  \"schema\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"findings\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"category\": {\"type\": \"string\"},\n            \"severity\": {\"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\"]},\n            \"title\": {\"type\": \"string\"},\n            \"explanation\": {\"type\": \"string\"},\n            \"evidence\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"field\": {\"type\": \"string\"},\n                \"excerpt\": {\"type\": \"string\"},\n                \"start\": {\"type\": [\"integer\", \"null\"]},\n                \"end\": {\"type\": [\"integer\", \"null\"]}\n              },\n              \"required\": [\"field\", \"excerpt\"]\n            },\n            \"suggested_fix\": {\"type\": [\"string\", \"null\"]},\n            \"confidence\": {\"type\": \"number\", \"minimum\": 0, \"maximum\": 1}\n          },\n          \"required\": [\"category\", \"severity\", \"title\", \"explanation\", \"evidence\", \"confidence\"]\n        }\n      }\n    },\n    \"required\": [\"findings\"]\n  }\n}"
+third_party_settings:
+  ai_qa_gate:
+    qa_report_plugin_id: accessibility_clarity
+    qa_report_configuration:
+      check_acronyms: true
+      check_jargon: true
+      check_sentence_length: true
+      check_readability: true
+      max_sentence_words: 25

@@ -1,6 +1,10 @@
-id: ec_digital_policy_baseline
+langcode: en
+status: true
+dependencies: {  }
+id: qa_ec_digital_policy_baseline
 label: 'EC Digital Policy Baseline'
-policy_text: |
+description: 'Core communication principles for EU digital policy content.'
+content: |
   ## Institutional Identity & Context
   This content is published on the European Commission's digital policy website. It represents official EU positions on digital policy matters.
 
@@ -28,33 +32,26 @@ policy_text: |
   3. Temporal Accuracy: Use appropriate tenses and time references
   4. Scope Clarity: Be precise about geographical and jurisdictional scope
 
-examples_good: |
-  GOOD: "The Digital Services Act, adopted in 2022, requires very large online platforms to..."
-  GOOD: "The Commission's proposal aims to establish minimum standards..."
-  GOOD: "Under the regulation, platforms with more than 45 million users are designated as..."
+  ### Good Examples
+  - "The Digital Services Act, adopted in 2022, requires very large online platforms to..."
+  - "The Commission's proposal aims to establish minimum standards..."
+  - "Under the regulation, platforms with more than 45 million users are designated as..."
 
-examples_bad: |
-  BAD: "The DSA guarantees user safety online" (overstates; regulation sets rules, doesn't guarantee outcomes)
-  BAD: "Europe leads the world in digital regulation" (promotional, unverifiable)
-  BAD: "The new rules will transform the digital landscape" (hyperbolic marketing language)
+  ### Bad Examples
+  - "The DSA guarantees user safety online" (overstates; regulation sets rules, doesn't guarantee outcomes)
+  - "Europe leads the world in digital regulation" (promotional, unverifiable)
+  - "The new rules will transform the digital landscape" (hyperbolic marketing language)
 
-disallowed_phrases: |
-  world-leading
-  revolutionary
-  groundbreaking
-  game-changing
-  unprecedented success
-  guarantees
-  ensures complete
-  will definitely
-  the best
-  first ever
-  most advanced
-
-required_disclaimers: ''
-
-metadata:
-  jurisdiction: EU
-  audience: policy_professionals
-  version: '1.0'
-
+  ### Disallowed Phrases
+  - world-leading
+  - revolutionary
+  - groundbreaking
+  - game-changing
+  - unprecedented success
+  - guarantees
+  - ensures complete
+  - will definitely
+  - the best
+  - first ever
+  - most advanced
+tags: []

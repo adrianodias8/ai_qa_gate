@@ -1,0 +1,27 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_gate_pii
+label: 'QA Gate: PII Policy'
+description: 'Analyzes content for personally identifiable information exposure and privacy policy compliance.'
+system_prompt: "You are an expert content reviewer specializing in privacy and policy compliance. Your task is to analyze content for PII exposure and policy violations.\n\n## Your Role\n- Identify personally identifiable information (PII) that should not be published\n- Flag inappropriate contact information\n- Detect internal references that should not be public\n- Identify confidential or draft markers left in content\n\n## Analysis Categories\n1. **PII Exposure**: Names, email addresses, phone numbers, identification numbers of private individuals\n2. **Contact Information**: Personal (non-institutional) contact details\n3. **Internal References**: Draft markers, internal document references, unpublished policy references\n4. **Confidential Content**: Content marked as confidential, internal-only, or draft\n\n## Important Distinctions\n- Institutional contact information (press@ec.europa.eu) is generally acceptable\n- Named public officials in their official capacity may be acceptable\n- Internal document references or draft numbers should be removed before publication\n\n## Severity Guidelines\n- **HIGH**: Clear PII exposure (personal emails, phone numbers, ID numbers), confidential content\n- **MEDIUM**: Internal references, draft markers, ambiguous personal information\n- **LOW**: Minor policy concerns, edge cases, potential improvements"
+secured_system_prompt: '[ai_agent:agent_instructions]'
+tools: {  }
+orchestration_agent: false
+triage_agent: false
+max_loops: 1
+default_information_tools: '[]'
+tool_usage_limits: {  }
+tool_settings: {  }
+masquerade_roles: {  }
+exclude_users_role: false
+structured_output_enabled: true
+structured_output_schema: "{\n  \"name\": \"qa_findings\",\n  \"schema\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"findings\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"category\": {\"type\": \"string\"},\n            \"severity\": {\"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\"]},\n            \"title\": {\"type\": \"string\"},\n            \"explanation\": {\"type\": \"string\"},\n            \"evidence\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"field\": {\"type\": \"string\"},\n                \"excerpt\": {\"type\": \"string\"},\n                \"start\": {\"type\": [\"integer\", \"null\"]},\n                \"end\": {\"type\": [\"integer\", \"null\"]}\n              },\n              \"required\": [\"field\", \"excerpt\"]\n            },\n            \"suggested_fix\": {\"type\": [\"string\", \"null\"]},\n            \"confidence\": {\"type\": \"number\", \"minimum\": 0, \"maximum\": 1}\n          },\n          \"required\": [\"category\", \"severity\", \"title\", \"explanation\", \"evidence\", \"confidence\"]\n        }\n      }\n    },\n    \"required\": [\"findings\"]\n  }\n}"
+third_party_settings:
+  ai_qa_gate:
+    qa_report_plugin_id: pii_policy
+    qa_report_configuration:
+      check_pii: true
+      check_contact_info: true
+      check_internal_references: true
+      check_confidential_markers: true

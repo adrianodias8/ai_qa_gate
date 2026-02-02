@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\ai_qa_gate\Form;
 
-use Drupal\ai_qa_gate\AiClient\AiClientInterface;
 use Drupal\ai_qa_gate\Entity\QaRunInterface;
 use Drupal\ai_qa_gate\Service\ProfileMatcher;
 use Drupal\ai_qa_gate\Service\RunnerInterface;
@@ -28,15 +27,12 @@ class RunQaForm extends FormBase {
    *   The profile matcher.
    * @param \Drupal\ai_qa_gate\Service\RunnerInterface $runner
    *   The runner service.
-   * @param \Drupal\ai_qa_gate\AiClient\AiClientInterface $aiClient
-   *   The AI client.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
    */
   public function __construct(
     protected readonly ProfileMatcher $profileMatcher,
     protected readonly RunnerInterface $runner,
-    protected readonly AiClientInterface $aiClient,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
   ) {}
 
@@ -47,7 +43,6 @@ class RunQaForm extends FormBase {
     return new static(
       $container->get('ai_qa_gate.profile_matcher'),
       $container->get('ai_qa_gate.runner'),
-      $container->get('ai_qa_gate.ai_client'),
       $container->get('entity_type.manager'),
     );
   }
@@ -88,18 +83,6 @@ class RunQaForm extends FormBase {
     }
 
     $form_state->set('profile_id', $profile->id());
-
-    // Check AI availability.
-    if (!$this->aiClient->isAvailable()) {
-      $form['error'] = [
-        '#type' => 'container',
-        '#attributes' => ['class' => ['messages', 'messages--error']],
-        'message' => [
-          '#markup' => $this->aiClient->getUnavailableMessage(),
-        ],
-      ];
-      return $form;
-    }
 
     $form['info'] = [
       '#type' => 'container',

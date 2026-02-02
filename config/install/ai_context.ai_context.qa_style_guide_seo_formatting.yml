@@ -1,0 +1,30 @@
+langcode: en
+status: true
+dependencies: {  }
+id: qa_style_guide_seo_formatting
+label: 'Style Guide - SEO and Formatting Review'
+description: 'Ensure content is formatted for readability and SEO.'
+content: |
+  ## SEO and Formatting Review
+
+  Ensure content is formatted for readability and SEO. Page titles should be short and specific. Meta descriptions must be concise and informative. Use subheadings, bullet points, and short paragraphs. Avoid keyword stuffing and generic link text.
+
+  ### Good Examples
+  - Title: "Apply for EU Student Funding – Step-by-Step Guide"
+  - Meta: "Learn how to apply for EU student funding with our step-by-step guide."
+  - Bullet list for benefits
+  - Link: "Download the EU funding application form"
+
+  ### Bad Examples
+  - Title: "BETTER REGULATION IN THE EUROPEAN UNION | EUROPEAN COMMISSION"
+  - Meta: "This page contains various information about EU funding."
+  - Walls of text without headings
+  - Link: "Click here"
+
+  ### Disallowed Phrases
+  - Redundant phrases in headings ("Welcome to...")
+  - Stop words in titles ("the," "and")
+  - Keyword stuffing
+  - Excessive sentence length (>25 words)
+  - Generic link text
+tags: []

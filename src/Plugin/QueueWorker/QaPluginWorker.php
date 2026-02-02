@@ -18,11 +18,11 @@ use Drupal\Core\Queue\QueueWorkerBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Queue worker for processing individual QA report plugins.
+ * Queue worker for processing individual QA agents.
  *
  * @QueueWorker(
  *   id = "ai_qa_gate_plugin_worker",
- *   title = @Translation("AI QA Gate Plugin Worker"),
+ *   title = @Translation("AI QA Gate Agent Worker"),
  *   cron = {"time" = 120}
  * )
  */
@@ -87,14 +87,16 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
   public function processItem($data): void {
     $logger = $this->loggerFactory->get('ai_qa_gate');
 
+    // Support both agent_id (new) and plugin_id (legacy) queue items.
+    $agentId = $data['agent_id'] ?? $data['plugin_id'] ?? '';
+
     // Validate data.
-    if (empty($data['qa_run_id']) || empty($data['plugin_id'])) {
-      $logger->error('Queue item missing required fields (qa_run_id or plugin_id).');
+    if (empty($data['qa_run_id']) || empty($agentId)) {
+      $logger->error('Queue item missing required fields (qa_run_id or agent_id).');
       return;
     }
 
     $qaRunId = $data['qa_run_id'];
-    $pluginId = $data['plugin_id'];
     $retryCount = $data['retry_count'] ?? 0;
     $delayUntil = $data['delay_until'] ?? 0;
 
@@ -102,12 +104,12 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
     $currentTime = $this->time->getRequestTime();
     if ($delayUntil > $currentTime) {
       $delay = $delayUntil - $currentTime;
-      $logger->info('Plugin @plugin for QA run @id is delayed by @delay seconds.', [
-        '@plugin' => $pluginId,
+      $logger->info('Agent @agent for QA run @id is delayed by @delay seconds.', [
+        '@agent' => $agentId,
         '@id' => $qaRunId,
         '@delay' => $delay,
       ]);
-      
+
       // Re-queue with delay exception if supported, otherwise just sleep.
       if (class_exists(DelayedRequeueException::class)) {
         throw new DelayedRequeueException($delay);
@@ -128,29 +130,29 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
       return;
     }
 
-    // Check if this plugin was already processed.
-    $pluginStatus = $qaRun->getPluginStatus($pluginId);
-    if ($pluginStatus !== QaRunInterface::STATUS_PENDING) {
-      $logger->notice('Plugin @plugin for QA run @id already processed with status @status.', [
-        '@plugin' => $pluginId,
+    // Check if this agent was already processed.
+    $agentStatus = $qaRun->getPluginStatus($agentId);
+    if ($agentStatus !== QaRunInterface::STATUS_PENDING) {
+      $logger->notice('Agent @agent for QA run @id already processed with status @status.', [
+        '@agent' => $agentId,
         '@id' => $qaRunId,
-        '@status' => $pluginStatus,
+        '@status' => $agentStatus,
       ]);
       return;
     }
 
-    $logger->info('Processing plugin @plugin for QA run @id.', [
-      '@plugin' => $pluginId,
+    $logger->info('Processing agent @agent for QA run @id.', [
+      '@agent' => $agentId,
       '@id' => $qaRunId,
     ]);
 
-    // Execute the plugin.
+    // Execute the agent.
     try {
-      $result = $this->runner->executePlugin($qaRun, $pluginId, $retryCount);
+      $result = $this->runner->executeAgent($qaRun, $agentId, $retryCount);
 
-      // Update plugin status.
+      // Update agent status.
       $qaRun->setPluginStatus(
-        $pluginId,
+        $agentId,
         $result['status'],
         $result['findings'] ?? NULL,
         $result['error'] ?? NULL
@@ -158,13 +160,13 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
 
       // Persist findings to dedicated database table for reliable storage.
       if ($result['status'] === QaRunInterface::STATUS_SUCCESS && !empty($result['findings'])) {
-        // Delete any existing findings for this plugin+run combination.
-        QaFinding::deleteForPlugin((int) $qaRunId, $pluginId);
+        // Delete any existing findings for this agent+run combination.
+        QaFinding::deleteForPlugin((int) $qaRunId, $agentId);
         // Create new findings.
-        QaFinding::createFromArray((int) $qaRunId, $pluginId, $result['findings']);
-        $logger->info('Persisted @count findings for plugin @plugin on QA run @id.', [
+        QaFinding::createFromArray((int) $qaRunId, $agentId, $result['findings']);
+        $logger->info('Persisted @count findings for agent @agent on QA run @id.', [
           '@count' => count($result['findings']),
-          '@plugin' => $pluginId,
+          '@agent' => $agentId,
           '@id' => $qaRunId,
         ]);
       }
@@ -177,18 +179,18 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
         $qaRun->set('model', $result['model']);
       }
 
-      // Check if all plugins are complete.
+      // Check if all agents are complete.
       $profile = $this->entityTypeManager->getStorage('qa_profile')->load($qaRun->getProfileId());
       if ($profile) {
-        $expectedPlugins = $profile->getEnabledReportPluginIds();
-        
-        if ($qaRun->areAllPluginsComplete($expectedPlugins)) {
-          // All plugins done - aggregate and finalize.
+        $expectedAgents = $profile->getAgentsEnabled();
+
+        if ($qaRun->areAllPluginsComplete($expectedAgents)) {
+          // All agents done - aggregate and finalize.
           $qaRun->aggregatePluginFindings();
           $qaRun->computeSummaryCounts();
           $qaRun->setStatus(QaRunInterface::STATUS_SUCCESS);
-          
-          $logger->info('QA run @id completed - all plugins finished.', [
+
+          $logger->info('QA run @id completed - all agents finished.', [
             '@id' => $qaRunId,
           ]);
         }
@@ -196,8 +198,8 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
 
       $qaRun->save();
 
-      $logger->info('Plugin @plugin completed for QA run @id with status @status.', [
-        '@plugin' => $pluginId,
+      $logger->info('Agent @agent completed for QA run @id with status @status.', [
+        '@agent' => $agentId,
         '@id' => $qaRunId,
         '@status' => $result['status'],
       ]);
@@ -205,7 +207,7 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
     catch (\Exception $e) {
       $errorMessage = $e->getMessage();
       $isRateLimitError = $this->isRateLimitError($errorMessage);
-      
+
       // Check if we should retry.
       $settings = $this->configFactory->get('ai_qa_gate.settings');
       $retryOnRateLimit = $settings->get('retry_on_rate_limit') ?? TRUE;
@@ -215,9 +217,9 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
         $backoffMultiplier = $settings->get('retry_backoff_multiplier') ?? 2.0;
         $baseBackoff = $settings->get('plugin_backoff_seconds') ?? 5;
         $retryDelay = (int) ($baseBackoff * pow($backoffMultiplier, $retryCount));
-        
-        $logger->warning('Rate limit hit for plugin @plugin (attempt @attempt/@max). Re-queuing with @delay second delay.', [
-          '@plugin' => $pluginId,
+
+        $logger->warning('Rate limit hit for agent @agent (attempt @attempt/@max). Re-queuing with @delay second delay.', [
+          '@agent' => $agentId,
           '@attempt' => $retryCount + 1,
           '@max' => $maxRetries,
           '@delay' => $retryDelay,
@@ -227,7 +229,7 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
         $queue = $this->queueFactory->get('ai_qa_gate_plugin_worker');
         $queue->createItem([
           'qa_run_id' => $qaRunId,
-          'plugin_id' => $pluginId,
+          'agent_id' => $agentId,
           'entity_type_id' => $data['entity_type_id'] ?? NULL,
           'entity_id' => $data['entity_id'] ?? NULL,
           'revision_id' => $data['revision_id'] ?? NULL,
@@ -240,11 +242,11 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
       }
 
       // Mark as failed.
-      $qaRun->setPluginStatus($pluginId, QaRunInterface::STATUS_FAILED, NULL, $errorMessage);
+      $qaRun->setPluginStatus($agentId, QaRunInterface::STATUS_FAILED, NULL, $errorMessage);
       $qaRun->save();
 
-      $logger->error('Plugin @plugin failed for QA run @id: @message', [
-        '@plugin' => $pluginId,
+      $logger->error('Agent @agent failed for QA run @id: @message', [
+        '@agent' => $agentId,
         '@id' => $qaRunId,
         '@message' => $errorMessage,
       ]);
@@ -282,4 +284,3 @@ class QaPluginWorker extends QueueWorkerBase implements ContainerFactoryPluginIn
   }
 
 }
-

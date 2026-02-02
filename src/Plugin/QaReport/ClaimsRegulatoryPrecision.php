@@ -75,23 +75,7 @@ class ClaimsRegulatoryPrecision extends QaReportPluginBase {
   /**
    * {@inheritdoc}
    */
-  public function buildPrompt(array $context, array $configuration): array {
-    $systemMessage = $this->buildSystemMessage($context);
-    $userMessage = $this->buildUserMessage($context, $configuration);
-
-    return [
-      'system_message' => $systemMessage,
-      'user_message' => $userMessage,
-      'output_schema_description' => $this->buildOutputFormatInstructions(),
-    ];
-  }
-
-  /**
-   * Builds the system message.
-   */
-  protected function buildSystemMessage(array $context): string {
-    $policies = $context['policies'] ?? '';
-
+  public function buildSystemMessage(): string {
     return <<<EOT
 You are an expert content reviewer specializing in EU/EC policy communications. Your task is to analyze content for claims accuracy, legislative precision, and regulatory compliance.
 
@@ -113,15 +97,13 @@ You are an expert content reviewer specializing in EU/EC policy communications. 
 - **HIGH**: Factually incorrect claims, wrong legislative status, serious attribution errors
 - **MEDIUM**: Overstated claims, missing important caveats, unclear status indicators
 - **LOW**: Minor precision issues, stylistic concerns, potential ambiguities
-
-{$policies}
 EOT;
   }
 
   /**
-   * Builds the user message.
+   * {@inheritdoc}
    */
-  protected function buildUserMessage(array $context, array $configuration): string {
+  public function buildUserMessage(array $context, array $configuration): string {
     $meta = $context['meta'] ?? [];
     $combinedText = $context['combined_text'] ?? '';
 

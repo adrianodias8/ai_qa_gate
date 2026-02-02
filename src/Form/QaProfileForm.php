@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Drupal\ai_qa_gate\Form;
 
-use Drupal\ai_qa_gate\QaReportPluginManager;
-use Drupal\ai\AiProviderPluginManager;
 use Drupal\content_moderation\ModerationInformationInterface;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\ReplaceCommand;
@@ -23,20 +21,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class QaProfileForm extends EntityForm {
 
   /**
-   * Constructs a QaProfileForm.
-   *
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
-   *   The entity type manager.
-   * @param \Drupal\Core\Entity\EntityTypeBundleInfoInterface $bundleInfo
-   *   The bundle info service.
-   * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entityFieldManager
-   *   The entity field manager.
-   * @param \Drupal\ai_qa_gate\QaReportPluginManager $reportPluginManager
-   *   The report plugin manager.
-   * @param \Drupal\ai\AiProviderPluginManager $aiProviderManager
-   *   The AI provider plugin manager.
-   */
-  /**
    * The bundle info service.
    *
    * @var \Drupal\Core\Entity\EntityTypeBundleInfoInterface
@@ -49,20 +33,6 @@ class QaProfileForm extends EntityForm {
    * @var \Drupal\Core\Entity\EntityFieldManagerInterface
    */
   protected EntityFieldManagerInterface $entityFieldManager;
-
-  /**
-   * The report plugin manager.
-   *
-   * @var \Drupal\ai_qa_gate\QaReportPluginManager
-   */
-  protected QaReportPluginManager $reportPluginManager;
-
-  /**
-   * The AI provider plugin manager.
-   *
-   * @var \Drupal\ai\AiProviderPluginManager
-   */
-  protected AiProviderPluginManager $aiProviderManager;
 
   /**
    * The moderation information service.
@@ -80,10 +50,6 @@ class QaProfileForm extends EntityForm {
    *   The bundle info service.
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entityFieldManager
    *   The entity field manager.
-   * @param \Drupal\ai_qa_gate\QaReportPluginManager $reportPluginManager
-   *   The report plugin manager.
-   * @param \Drupal\ai\AiProviderPluginManager $aiProviderManager
-   *   The AI provider plugin manager.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $moduleHandler
    *   The module handler (inherited from EntityForm).
    * @param \Drupal\content_moderation\ModerationInformationInterface|null $moderationInformation
@@ -93,16 +59,12 @@ class QaProfileForm extends EntityForm {
     EntityTypeManagerInterface $entityTypeManager,
     EntityTypeBundleInfoInterface $bundleInfo,
     EntityFieldManagerInterface $entityFieldManager,
-    QaReportPluginManager $reportPluginManager,
-    AiProviderPluginManager $aiProviderManager,
     ModuleHandlerInterface $moduleHandler,
     ?ModerationInformationInterface $moderationInformation = NULL,
   ) {
     $this->setEntityTypeManager($entityTypeManager);
     $this->bundleInfo = $bundleInfo;
     $this->entityFieldManager = $entityFieldManager;
-    $this->reportPluginManager = $reportPluginManager;
-    $this->aiProviderManager = $aiProviderManager;
     // EntityForm already has $moduleHandler property, so we can set it directly.
     $this->moduleHandler = $moduleHandler;
     $this->moderationInformation = $moderationInformation;
@@ -120,8 +82,6 @@ class QaProfileForm extends EntityForm {
       $container->get('entity_type.manager'),
       $container->get('entity_type.bundle.info'),
       $container->get('entity_field.manager'),
-      $container->get('plugin.manager.qa_report'),
-      $container->get('ai.provider'),
       $container->get('module_handler'),
       $moderationInformation,
     );
@@ -442,174 +402,44 @@ class QaProfileForm extends EntityForm {
       '#default_value' => $includeMeta['include_taxonomy_labels'] ?? FALSE,
     ];
 
-    // Policies.
-    $policies = $this->entityTypeManager->getStorage('qa_policy')->loadMultiple();
-    $policyOptions = [];
-    foreach ($policies as $policy) {
-      $policyOptions[$policy->id()] = $policy->label();
+    // Agents enabled.
+    $agentStorage = $this->entityTypeManager->getStorage('ai_agent');
+    $allAgents = $agentStorage->loadMultiple();
+    $agentsEnabled = $profile->getAgentsEnabled();
+
+    // Filter to only agents that have a QA Report plugin configured.
+    $qaAgentOptions = [];
+    foreach ($allAgents as $agent) {
+      $pluginId = $agent->getThirdPartySetting('ai_qa_gate', 'qa_report_plugin_id', '');
+      if (!empty($pluginId)) {
+        $qaAgentOptions[$agent->id()] = $agent->label() . ' (' . $pluginId . ')';
+      }
     }
 
-    $form['policy_ids'] = [
-      '#type' => 'checkboxes',
-      '#title' => $this->t('Policies to inject'),
-      '#options' => $policyOptions,
-      '#default_value' => $profile->getPolicyIds(),
-      '#description' => $this->t('Select policies to inject into the analysis prompt.'),
-    ];
-
-    // Reports.
-    $reportPlugins = $this->reportPluginManager->getDefinitions();
-    $reportsEnabled = $profile->getReportsEnabled();
-
-    $form['reports_enabled'] = [
+    $form['agents_enabled'] = [
       '#type' => 'details',
-      '#title' => $this->t('Report plugins'),
+      '#title' => $this->t('QA Agents'),
+      '#description' => $this->t('Select which AI agents to run for this profile. Only agents with a QA Report plugin configured are shown. Configure plugins on the <a href=":url">AI Agent edit form</a>.', [
+        ':url' => '/admin/config/ai/agents',
+      ]),
       '#open' => TRUE,
       '#tree' => TRUE,
     ];
 
-    foreach ($reportPlugins as $pluginId => $definition) {
-      $reportConfig = $this->getReportConfig($reportsEnabled, (string) $pluginId);
-      $pluginConfiguration = $reportConfig['configuration'] ?? [];
-
-      $form['reports_enabled'][$pluginId] = [
-        '#type' => 'details',
-        '#title' => $definition['label'] ?? $pluginId,
-        '#description' => $definition['description'] ?? '',
-        '#open' => !empty($reportConfig['enabled']),
+    if (empty($qaAgentOptions)) {
+      $form['agents_enabled']['no_agents'] = [
+        '#markup' => '<p>' . $this->t('No AI agents with QA Report plugins configured. Please configure QA Report plugins on AI Agent entities first.') . '</p>',
       ];
-
-      $form['reports_enabled'][$pluginId]['enabled'] = [
-        '#type' => 'checkbox',
-        '#title' => $this->t('Enable this report'),
-        '#default_value' => !empty($reportConfig['enabled']),
-      ];
-
-      // Create plugin instance to get configuration form.
-      try {
-        /** @var \Drupal\ai_qa_gate\Plugin\QaReport\QaReportPluginInterface $plugin */
-        $plugin = $this->reportPluginManager->createInstance($pluginId, $pluginConfiguration);
-        $configForm = $plugin->buildConfigurationForm([], $form_state);
-
-        if (!empty($configForm)) {
-          $form['reports_enabled'][$pluginId]['configuration'] = [
-            '#type' => 'container',
-            '#tree' => TRUE,
-            '#states' => [
-              'visible' => [
-                ':input[name="reports_enabled[' . $pluginId . '][enabled]"]' => ['checked' => TRUE],
-              ],
-            ],
-          ];
-
-          foreach ($configForm as $key => $element) {
-            // Skip render elements that start with #.
-            if (str_starts_with($key, '#')) {
-              continue;
-            }
-            $form['reports_enabled'][$pluginId]['configuration'][$key] = $element;
-          }
-        }
-      }
-      catch (\Exception $e) {
-        // If plugin instantiation fails, just skip the configuration form.
-        $this->messenger()->addWarning($this->t('Could not load configuration for plugin @plugin: @error', [
-          '@plugin' => $pluginId,
-          '@error' => $e->getMessage(),
-        ]));
+    }
+    else {
+      foreach ($qaAgentOptions as $agentId => $agentLabel) {
+        $form['agents_enabled'][$agentId] = [
+          '#type' => 'checkbox',
+          '#title' => $agentLabel,
+          '#default_value' => in_array($agentId, $agentsEnabled, TRUE),
+        ];
       }
     }
-
-    // AI settings.
-    $aiSettings = $profile->getAiSettings();
-    $form['ai_settings'] = [
-      '#type' => 'details',
-      '#title' => $this->t('AI settings'),
-      '#tree' => TRUE,
-      '#description' => $this->t('Leave empty to use the default AI provider settings.'),
-    ];
-
-    // Get available providers for chat operation.
-    $providers = $this->aiProviderManager->getProvidersForOperationType('chat', TRUE);
-    $providerOptions = ['' => $this->t('- Use default -')];
-    foreach ($providers as $id => $definition) {
-      $providerOptions[$id] = $definition['label'];
-    }
-
-    $selectedProvider = $form_state->getValue(['ai_settings', 'provider_id']) ?? $aiSettings['provider_id'] ?? '';
-
-    $form['ai_settings']['provider_id'] = [
-      '#type' => 'select',
-      '#title' => $this->t('Provider'),
-      '#options' => $providerOptions,
-      '#default_value' => $selectedProvider,
-      '#description' => $this->t('Select an AI provider to use for this profile. Leave empty to use the default.'),
-      '#ajax' => [
-        'callback' => '::updateModelOptions',
-        'wrapper' => 'ai-model-wrapper',
-        'event' => 'change',
-      ],
-    ];
-
-    // Model selection container.
-    $form['ai_settings']['model_wrapper'] = [
-      '#type' => 'container',
-      '#attributes' => ['id' => 'ai-model-wrapper'],
-    ];
-
-    // Get models for selected provider.
-    $modelOptions = ['' => $this->t('- Use default -')];
-    if ($selectedProvider && !empty($providers[$selectedProvider])) {
-      try {
-        $provider = $this->aiProviderManager->createInstance($selectedProvider);
-        $models = $provider->getConfiguredModels('chat');
-        if (!empty($models)) {
-          $modelOptions = ['' => $this->t('- Use default -')] + $models;
-        }
-        elseif (!$provider->isUsable('chat')) {
-          $this->messenger()->addWarning($this->t('Provider %provider is not properly configured for chat operations.', [
-            '%provider' => $selectedProvider,
-          ]));
-        }
-      }
-      catch (\Exception $e) {
-        // Provider not fully configured, show error message.
-        $this->messenger()->addWarning($this->t('Error loading models for provider %provider: %error', [
-          '%provider' => $selectedProvider,
-          '%error' => $e->getMessage(),
-        ]));
-      }
-    }
-
-    $form['ai_settings']['model_wrapper']['model'] = [
-      '#type' => 'select',
-      '#title' => $this->t('Model'),
-      '#options' => $modelOptions,
-      '#empty_option' => $this->t('- Use default -'),
-      '#default_value' => $aiSettings['model'] ?? '',
-      '#description' => $this->t('Select a model to use. Leave empty to use the default model for the selected provider.'),
-      '#disabled' => empty($selectedProvider),
-    ];
-
-    $form['ai_settings']['temperature'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Temperature'),
-      '#default_value' => $aiSettings['temperature'] ?? 0.2,
-      '#min' => 0,
-      '#max' => 2,
-      '#step' => 0.1,
-      '#description' => $this->t('Controls randomness in AI responses. Lower values (0.0-0.3) produce more focused, deterministic outputs ideal for structured analysis. Higher values (0.7-1.0) increase creativity but reduce consistency. Recommended: 0.2 for QA analysis.'),
-    ];
-
-    $form['ai_settings']['max_tokens'] = [
-      '#type' => 'number',
-      '#title' => $this->t('Max tokens'),
-      '#default_value' => $aiSettings['max_tokens'] ?? 3000,
-      '#min' => 100,
-      '#max' => 100000,
-      '#step' => 100,
-      '#description' => $this->t('Maximum number of tokens in the AI response. For QA analysis with structured JSON output, 2000-4000 tokens is typically sufficient. Lower values may truncate findings. Higher values increase cost but allow more detailed analysis. Recommended: 3000 tokens.'),
-    ];
 
     // Execution settings.
     $executionSettings = $profile->getExecutionSettings();
@@ -926,81 +756,6 @@ class QaProfileForm extends EntityForm {
   }
 
   /**
-   * Ajax callback to update model options based on selected provider.
-   */
-  public function updateModelOptions(array &$form, FormStateInterface $form_state): array {
-    // Get the selected provider from user input (for AJAX, use getUserInput).
-    $userInput = $form_state->getUserInput();
-    $selectedProvider = $userInput['ai_settings']['provider_id'] ?? '';
-
-    // Get the current model value from user input.
-    $currentModel = $userInput['ai_settings']['model_wrapper']['model'] ?? $userInput['ai_settings']['model'] ?? '';
-
-    // If no provider is selected, return empty model container.
-    if (empty($selectedProvider)) {
-      $form['ai_settings']['model_wrapper']['model']['#options'] = ['' => $this->t('- Use default -')];
-      $form['ai_settings']['model_wrapper']['model']['#empty_option'] = $this->t('- Use default -');
-      $form['ai_settings']['model_wrapper']['model']['#value'] = '';
-      $form['ai_settings']['model_wrapper']['model']['#disabled'] = TRUE;
-      $form_state->setValue(['ai_settings', 'model_wrapper', 'model'], '');
-      return $form['ai_settings']['model_wrapper'];
-    }
-
-    // Get the models for this provider.
-    $models = [];
-    try {
-      $provider = $this->aiProviderManager->createInstance($selectedProvider);
-      $models = $provider->getConfiguredModels('chat');
-      if (empty($models) && !$provider->isUsable('chat')) {
-        $this->messenger()->addWarning($this->t('Provider %provider is not properly configured for chat operations.', [
-          '%provider' => $selectedProvider,
-        ]));
-      }
-      elseif (empty($models)) {
-        $this->messenger()->addWarning($this->t('No models available for provider %provider. Please configure enabled models in the provider settings.', [
-          '%provider' => $selectedProvider,
-        ]));
-      }
-    }
-    catch (\Exception $e) {
-      // Provider not fully configured or error getting models.
-      $this->messenger()->addError($this->t('Error loading models for provider %provider: %error', [
-        '%provider' => $selectedProvider,
-        '%error' => $e->getMessage(),
-      ]));
-    }
-
-    // Build model options with empty option first.
-    $modelOptions = ['' => $this->t('- Use default -')] + $models;
-
-    // If we have a current model value, check if it's still valid for the new provider.
-    if ($currentModel && !isset($modelOptions[$currentModel])) {
-      // If the current model is not valid for the new provider, clear it.
-      $currentModel = '';
-      unset($userInput['ai_settings']['model_wrapper']['model']);
-      $form_state->setUserInput($userInput);
-    }
-
-    // Update the model select element - ensure it exists first.
-    if (!isset($form['ai_settings']['model_wrapper']['model'])) {
-      $form['ai_settings']['model_wrapper']['model'] = [
-        '#type' => 'select',
-        '#title' => $this->t('Model'),
-      ];
-    }
-
-    $form['ai_settings']['model_wrapper']['model']['#options'] = $modelOptions;
-    $form['ai_settings']['model_wrapper']['model']['#empty_option'] = $this->t('- Use default -');
-    $form['ai_settings']['model_wrapper']['model']['#value'] = $currentModel;
-    $form['ai_settings']['model_wrapper']['model']['#disabled'] = FALSE;
-
-    // Ensure the form state maintains the model value.
-    $form_state->setValue(['ai_settings', 'model_wrapper', 'model'], $currentModel);
-
-    return $form['ai_settings']['model_wrapper'];
-  }
-
-  /**
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state): void {
@@ -1020,18 +775,18 @@ class QaProfileForm extends EntityForm {
       $form_state->setErrorByName('fields_to_analyze', $this->t('Please select at least one field to analyze.'));
     }
 
-    // Validate that at least one report is enabled.
-    $reports = $form_state->getValue('reports_enabled') ?? [];
-    $hasReport = FALSE;
-    foreach ($reports as $config) {
-      if (!empty($config['enabled'])) {
-        $hasReport = TRUE;
+    // Validate that at least one agent is enabled.
+    $agents = $form_state->getValue('agents_enabled') ?? [];
+    $hasAgent = FALSE;
+    foreach ($agents as $agentId => $enabled) {
+      if (!empty($enabled)) {
+        $hasAgent = TRUE;
         break;
       }
     }
 
-    if (!$hasReport) {
-      $form_state->setErrorByName('reports_enabled', $this->t('Please enable at least one report plugin.'));
+    if (!$hasAgent) {
+      $form_state->setErrorByName('agents_enabled', $this->t('Please enable at least one QA agent.'));
     }
   }
 
@@ -1058,38 +813,15 @@ class QaProfileForm extends EntityForm {
     }
     $profile->set('fields_to_analyze', $fields);
 
-    // Process policy_ids.
-    $policyIds = array_filter($form_state->getValue('policy_ids') ?? []);
-    $profile->set('policy_ids', array_values($policyIds));
-
-    // Process reports_enabled.
-    $reportsRaw = $form_state->getValue('reports_enabled') ?? [];
-    $reports = [];
-    foreach ($reportsRaw as $pluginId => $config) {
-      // Extract plugin-specific configuration.
-      $pluginConfig = [];
-      if (!empty($config['configuration']) && is_array($config['configuration'])) {
-        $pluginConfig = $config['configuration'];
+    // Process agents_enabled.
+    $agentsRaw = $form_state->getValue('agents_enabled') ?? [];
+    $enabledAgents = [];
+    foreach ($agentsRaw as $agentId => $enabled) {
+      if (!empty($enabled)) {
+        $enabledAgents[] = $agentId;
       }
-
-      $reports[] = [
-        'plugin_id' => $pluginId,
-        'enabled' => !empty($config['enabled']),
-        'configuration' => $pluginConfig,
-      ];
     }
-    $profile->set('reports_enabled', $reports);
-
-    // Process AI settings.
-    $aiSettings = $form_state->getValue('ai_settings') ?? [];
-    // Model may be nested under model_wrapper or directly under ai_settings.
-    $model = $aiSettings['model_wrapper']['model'] ?? $aiSettings['model'] ?? NULL;
-    $profile->set('ai_settings', [
-      'provider_id' => !empty($aiSettings['provider_id']) ? $aiSettings['provider_id'] : NULL,
-      'model' => !empty($model) ? $model : NULL,
-      'temperature' => isset($aiSettings['temperature']) && $aiSettings['temperature'] !== '' ? (float) $aiSettings['temperature'] : 0.2,
-      'max_tokens' => isset($aiSettings['max_tokens']) && $aiSettings['max_tokens'] !== '' ? (int) $aiSettings['max_tokens'] : 3000,
-    ]);
+    $profile->set('agents_enabled', $enabledAgents);
 
     // Process gating settings.
     $gatingSettings = $form_state->getValue('gating_settings') ?? [];
@@ -1228,18 +960,6 @@ class QaProfileForm extends EntityForm {
   protected function getFieldConfig(array $fieldsConfig, string $fieldName): array {
     foreach ($fieldsConfig as $config) {
       if (($config['field_name'] ?? '') === $fieldName) {
-        return $config;
-      }
-    }
-    return [];
-  }
-
-  /**
-   * Gets report config from array.
-   */
-  protected function getReportConfig(array $reportsEnabled, string $pluginId): array {
-    foreach ($reportsEnabled as $config) {
-      if (($config['plugin_id'] ?? '') === $pluginId) {
         return $config;
       }
     }
